@@ -65,8 +65,8 @@ class DatabaseManager:
                 T_Min REAL,
                 T_Max REAL,
                 MP REAL,
-                Adh REAL,
-                Sol REAL,
+                Adh VARCHAR,
+                Sol VARCHAR,
                 K_IM REAL,
                 RP REAL,
                 TR REAL,
@@ -655,11 +655,11 @@ class BiosensorGUI:
             'immobilization': {
                 'ph_min': {'min': 4.0, 'max': 9.0},  # Расширили диапазон
                 'ph_max': {'min': 4.0, 'max': 9.0},  # Расширили диапазон
-                't_min': {'min': 15, 'max': 50},
-                't_max': {'min': 15, 'max': 50},
+                't_min': {'min': 4, 'max': 95},
+                't_max': {'min': 4, 'max': 95},
                 'young_modulus': {'min': 0, 'max': 100},
-                'adhesion': {'min': 0, 'max': 100},
-                'solubility': {'min': 0, 'max': 100},
+                # 'adhesion': {'min': 0, 'max': 100}, # замена на строчный тип
+                # 'solubility': {'min': 0, 'max': 100}, # замена на строчный тип
                 'loss_coefficient': {'min': 0, 'max': 1},
                 'reproducibility': {'min': 0, 'max': 100},
                 'response_time': {'min': 0, 'max': 3600},
@@ -723,10 +723,10 @@ class BiosensorGUI:
                 {'label': 'ID иммобилизации:', 'var_name': 'im_id', 'hint': 'Например: IM001'},
                 {'label': 'Название:', 'var_name': 'im_name', 'hint': 'Тип иммобилизации'},
                 {'label': 'pH диапазон:', 'type': 'range', 'min_var': 'ph_min', 'max_var': 'ph_max', 'hint': '4.0 — 9.0'},
-                {'label': 'Температурный диапазон (°C):', 'type': 'range', 'min_var': 't_min', 'max_var': 't_max', 'hint': '15 — 50'},
+                {'label': 'Температурный диапазон (°C):', 'type': 'range', 'min_var': 't_min', 'max_var': 't_max', 'hint': '4 — 95'},
                 {'label': 'Модуль Юнга:', 'var_name': 'young_modulus', 'hint': '0-100'},
-                {'label': 'Адгезия (%):', 'var_name': 'adhesion', 'hint': '0-100'},
-                {'label': 'Растворимость (%):', 'var_name': 'solubility', 'hint': '0-100'},
+                {'label': 'Адгезия (%):', 'var_name': 'adhesion', 'hint': 'Например: высокая'},
+                {'label': 'Растворимость (%):', 'var_name': 'solubility', 'hint': 'Например: средняя'},
                 {'label': 'Коэффициент потерь:', 'var_name': 'loss_coefficient', 'hint': '0-1'},
                 {'label': 'Воспроизводимость (%):', 'var_name': 'reproducibility', 'hint': '0-100'},
                 {'label': 'Время отклика (с):', 'var_name': 'response_time', 'hint': '0-3600'},
@@ -938,8 +938,8 @@ class BiosensorGUI:
                     'T_Min': self.safe_float_convert(immob_vars['t_min'].get(), 't_min', 'immobilization'),
                     'T_Max': self.safe_float_convert(immob_vars['t_max'].get(), 't_max', 'immobilization'),
                     'MP': self.safe_float_convert(immob_vars['young_modulus'].get(), 'young_modulus', 'immobilization'),
-                    'Adh': self.safe_float_convert(immob_vars['adhesion'].get(), 'adhesion', 'immobilization'),
-                    'Sol': self.safe_float_convert(immob_vars['solubility'].get(), 'solubility', 'immobilization'),
+                    'Adh': immob_vars['adhesion'].get(), # смена типа на строчный
+                    'Sol': immob_vars['solubility'].get(), # замена на строчный тип
                     'K_IM': self.safe_float_convert(immob_vars['loss_coefficient'].get(), 'loss_coefficient', 'immobilization'),
                     'RP': self.safe_float_convert(immob_vars['reproducibility'].get(), 'reproducibility', 'immobilization'),
                     'TR': self.safe_float_convert(immob_vars['response_time'].get(), 'response_time', 'immobilization'),
