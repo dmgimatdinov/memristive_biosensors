@@ -560,10 +560,10 @@ class Section:
             return 'break'
         
         # Привязка клавиш
-        entry.bind('<Control-c>', copy_text)
-        entry.bind('<Control-C>', copy_text)
-        entry.bind('<Control-v>', paste_text)
-        entry.bind('<Control-V>', paste_text)
+        # entry.bind('<Control-c>', copy_text) # already implemented
+        # entry.bind('<Control-C>', copy_text) # already implemented
+        # entry.bind('<Control-v>', paste_text) # already implemented
+        # entry.bind('<Control-V>', paste_text) # already implemented
         entry.bind('<Control-x>', cut_text)
         entry.bind('<Control-X>', cut_text)
         entry.bind('<Control-a>', select_all)
