@@ -630,34 +630,34 @@ class BiosensorGUI:
         # Ограничения для валидации полей
         self.field_constraints = {
             'analyte': {
-                'ph_min': {'min': 4.0, 'max': 9.0},  # Расширили диапазон
-                'ph_max': {'min': 4.0, 'max': 9.0},  # Расширили диапазон
-                't_max': {'min': 0, 'max': 100},
+                'ph_min': {'min': 2.0, 'max': 10.0},  # Расширили диапазон
+                'ph_max': {'min': 2.0, 'max': 10.0},  # Расширили диапазон
+                't_max': {'min': 0, 'max': 180},
                 'stability': {'min': 0, 'max': 365},
                 'half_life': {'min': 0, 'max': 8760},
                 'power_consumption': {'min': 0, 'max': 1000}
             },
             'bio_recognition': {
-                'ph_min': {'min': 4.0, 'max': 9.0},  # Расширили диапазон
-                'ph_max': {'min': 4.0, 'max': 9.0},  # Расширили диапазон
-                't_min': {'min': 20, 'max': 40},
-                't_max': {'min': 20, 'max': 40},
-                'dr_min': {'min': 0.1, 'max': 100},
-                'dr_max': {'min': 0.1, 'max': 100},
-                'sensitivity': {'min': 0, 'max': 1000},
+                'ph_min': {'min': 2.0, 'max': 10.0},  # Расширили диапазон
+                'ph_max': {'min': 2.0, 'max': 10.0},  # Расширили диапазон
+                't_min': {'min': 4, 'max': 120},
+                't_max': {'min': 4, 'max': 120},
+                'dr_min': {'min': 0.1, 'max': 1000000000000},
+                'dr_max': {'min': 0.1, 'max': 1000000000000},
+                'sensitivity': {'min': 0, 'max': 20000},
                 'reproducibility': {'min': 0, 'max': 100},
                 'response_time': {'min': 0, 'max': 3600},
                 'stability': {'min': 0, 'max': 365},
-                'lod': {'min': 0, 'max': 1000},
+                'lod': {'min': 0, 'max': 50000},
                 'durability': {'min': 0, 'max': 8760},
                 'power_consumption': {'min': 0, 'max': 1000}
             },
             'immobilization': {
-                'ph_min': {'min': 4.0, 'max': 9.0},  # Расширили диапазон
-                'ph_max': {'min': 4.0, 'max': 9.0},  # Расширили диапазон
-                't_min': {'min': 4, 'max': 95},
-                't_max': {'min': 4, 'max': 95},
-                'young_modulus': {'min': 0, 'max': 100},
+                'ph_min': {'min': 2.0, 'max': 10.0},  # Расширили диапазон
+                'ph_max': {'min': 2.0, 'max': 10.0},  # Расширили диапазон
+                't_min': {'min': 4, 'max': 120},
+                't_max': {'min': 4, 'max': 120},
+                'young_modulus': {'min': 0, 'max': 1000},
                 # 'adhesion': {'min': 0, 'max': 100}, # замена на строчный тип
                 # 'solubility': {'min': 0, 'max': 100}, # замена на строчный тип
                 'loss_coefficient': {'min': 0, 'max': 1},
@@ -668,13 +668,13 @@ class BiosensorGUI:
                 'power_consumption': {'min': 0, 'max': 1000}
             },
             'memristive': {
-                'ph_min': {'min': 4.0, 'max': 10.0},
-                'ph_max': {'min': 4.0, 'max': 10.0},
-                't_min': {'min': 5, 'max': 100},
-                't_max': {'min': 5, 'max': 100},
+                'ph_min': {'min': 2.0, 'max': 10.0},
+                'ph_max': {'min': 2.0, 'max': 10.0},
+                't_min': {'min': 5, 'max': 120},
+                't_max': {'min': 5, 'max': 120},
                 'dr_min': {'min': 0.01, 'max': 1000},
                 'dr_max': {'min': 0.01, 'max': 1000},
-                'young_modulus': {'min': 0, 'max': 100},
+                'young_modulus': {'min': 0, 'max': 1000},
                 'sensitivity': {'min': 0, 'max': 1000},
                 'reproducibility': {'min': 0, 'max': 100},
                 'response_time': {'min': 0, 'max': 3600},
@@ -699,8 +699,8 @@ class BiosensorGUI:
             'analyte': [
                 {'label': 'ID аналита:', 'var_name': 'ta_id', 'hint': 'Например: TA001'},
                 {'label': 'Название:', 'var_name': 'ta_name', 'hint': 'Полное название аналита'},
-                {'label': 'pH диапазон:', 'type': 'range', 'min_var': 'ph_min', 'max_var': 'ph_max', 'hint': '4.0 — 9.0'},
-                {'label': 'Макс. температура (°C):', 'var_name': 't_max', 'hint': '0-100'},
+                {'label': 'pH диапазон:', 'type': 'range', 'min_var': 'ph_min', 'max_var': 'ph_max', 'hint': '2.0 — 10.0'},
+                {'label': 'Макс. температура (°C):', 'var_name': 't_max', 'hint': '0-180'},
                 {'label': 'Стабильность (дни):', 'var_name': 'stability', 'hint': '0-365'},
                 {'label': 'Период полураспада (ч):', 'var_name': 'half_life', 'hint': '0-8760'},
                 {'label': 'Энергопотребление (мВт):', 'var_name': 'power_consumption', 'hint': '0-1000'}
@@ -708,23 +708,23 @@ class BiosensorGUI:
             'bio_recognition': [
                 {'label': 'ID биослоя:', 'var_name': 'bre_id', 'hint': 'Например: BRE001'},
                 {'label': 'Название:', 'var_name': 'bre_name', 'hint': 'Тип биослоя'},
-                {'label': 'pH диапазон:', 'type': 'range', 'min_var': 'ph_min', 'max_var': 'ph_max', 'hint': '4.0 — 9.0'},
-                {'label': 'Температурный диапазон (°C):', 'type': 'range', 'min_var': 't_min', 'max_var': 't_max', 'hint': '20 — 40'},
-                {'label': 'Диапазон измерений:', 'type': 'range', 'min_var': 'dr_min', 'max_var': 'dr_max', 'hint': '0.1 — 100'},
-                {'label': 'Чувствительность:', 'var_name': 'sensitivity', 'hint': '0-1000'},
+                {'label': 'pH диапазон:', 'type': 'range', 'min_var': 'ph_min', 'max_var': 'ph_max', 'hint': '2.0 — 10.0'},
+                {'label': 'Температурный диапазон (°C):', 'type': 'range', 'min_var': 't_min', 'max_var': 't_max', 'hint': '2 — 120'},
+                {'label': 'Диапазон измерений (пМ):', 'type': 'range', 'min_var': 'dr_min', 'max_var': 'dr_max', 'hint': '0.1 — 1*10^12'},
+                {'label': 'Чувствительность (мкА/(мкМ*см^2)):', 'var_name': 'sensitivity', 'hint': '0.0001 — 2*10^4'},
                 {'label': 'Воспроизводимость (%):', 'var_name': 'reproducibility', 'hint': '0-100'},
                 {'label': 'Время отклика (с):', 'var_name': 'response_time', 'hint': '0-3600'},
                 {'label': 'Стабильность (дни):', 'var_name': 'stability', 'hint': '0-365'},
-                {'label': 'Предел обнаружения:', 'var_name': 'lod', 'hint': '0-1000'},
+                {'label': 'Предел обнаружения (нМ):', 'var_name': 'lod', 'hint': '0-50000'},
                 {'label': 'Долговечность (ч):', 'var_name': 'durability', 'hint': '0-8760'},
                 {'label': 'Энергопотребление (мВт):', 'var_name': 'power_consumption', 'hint': '0-1000'}
             ],
             'immobilization': [
                 {'label': 'ID иммобилизации:', 'var_name': 'im_id', 'hint': 'Например: IM001'},
                 {'label': 'Название:', 'var_name': 'im_name', 'hint': 'Тип иммобилизации'},
-                {'label': 'pH диапазон:', 'type': 'range', 'min_var': 'ph_min', 'max_var': 'ph_max', 'hint': '4.0 — 9.0'},
+                {'label': 'pH диапазон:', 'type': 'range', 'min_var': 'ph_min', 'max_var': 'ph_max', 'hint': '2.0 — 10.0'},
                 {'label': 'Температурный диапазон (°C):', 'type': 'range', 'min_var': 't_min', 'max_var': 't_max', 'hint': '4 — 95'},
-                {'label': 'Модуль Юнга:', 'var_name': 'young_modulus', 'hint': '0-100'},
+                {'label': 'Модуль Юнга (ГПа):', 'var_name': 'young_modulus', 'hint': '0-1000'},
                 {'label': 'Адгезия (%):', 'var_name': 'adhesion', 'hint': 'Например: высокая'},
                 {'label': 'Растворимость (%):', 'var_name': 'solubility', 'hint': 'Например: средняя'},
                 {'label': 'Коэффициент потерь:', 'var_name': 'loss_coefficient', 'hint': '0-1'},
@@ -737,11 +737,11 @@ class BiosensorGUI:
             'memristive': [
                 {'label': 'ID мемристора:', 'var_name': 'mem_id', 'hint': 'Например: MEM001'},
                 {'label': 'Название:', 'var_name': 'mem_name', 'hint': 'Тип мемристора'},
-                {'label': 'pH диапазон:', 'type': 'range', 'min_var': 'ph_min', 'max_var': 'ph_max', 'hint': '4.0 — 10.0'},
+                {'label': 'pH диапазон:', 'type': 'range', 'min_var': 'ph_min', 'max_var': 'ph_max', 'hint': '2.0 — 10.0'},
                 {'label': 'Температурный диапазон (°C):', 'type': 'range', 'min_var': 't_min', 'max_var': 't_max', 'hint': '5 — 100'},
                 {'label': 'Диапазон измерений:', 'type': 'range', 'min_var': 'dr_min', 'max_var': 'dr_max', 'hint': '0.01 — 1000'},
-                {'label': 'Модуль Юнга:', 'var_name': 'young_modulus', 'hint': '0-100'},
-                {'label': 'Чувствительность:', 'var_name': 'sensitivity', 'hint': '0-1000'},
+                {'label': 'Модуль Юнга (ГПа):', 'var_name': 'young_modulus', 'hint': '0-1000'},
+                {'label': 'Чувствительность (мВ/dec):', 'var_name': 'sensitivity', 'hint': '0-1000'},
                 {'label': 'Воспроизводимость (%):', 'var_name': 'reproducibility', 'hint': '0-100'},
                 {'label': 'Время отклика (с):', 'var_name': 'response_time', 'hint': '0-3600'},
                 {'label': 'Стабильность (дни):', 'var_name': 'stability', 'hint': '0-365'},
