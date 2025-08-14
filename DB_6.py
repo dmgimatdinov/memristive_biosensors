@@ -235,6 +235,33 @@ class DatabaseManager:
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки мемристивного слоя: {e}")
             return False
+        
+    def insert_sensor_combination(self, data: Dict[str, Any]) -> bool:
+        """Вставка или замена комбинации сенсора с проверкой дубликатов."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT Combo_ID FROM SensorCombinations WHERE Combo_ID = ?", (data['Combo_ID'],))
+        if cursor.fetchone():
+            if not messagebox.askyesno("Подтверждение перезаписи", f"Комбинация {data['Combo_ID']} уже существует. Перезаписать?"):
+                return False
+        query = """
+        INSERT OR REPLACE INTO SensorCombinations 
+        (Combo_ID, TA_ID, BRE_ID, IM_ID, MEM_ID, SN_total, TR_total, ST_total, RP_total, LOD_total, DR_total, HL_total, PC_total, Score, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor.execute(query, (
+                data['Combo_ID'], data.get('TA_ID'), data.get('BRE_ID'), data.get('IM_ID'),
+                data.get('MEM_ID'), data.get('SN_total'), data.get('TR_total'), data.get('ST_total'),
+                data.get('RP_total'), data.get('LOD_total'), data.get('DR_total'), data.get('HL_total'),
+                data.get('PC_total'), data.get('Score'), data.get('created_at')
+            ))
+            self.conn.commit()
+            self.clear_cache()
+            self.logger.info(f"Комбинация сенсора {data['Combo_ID']} успешно вставлена")
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка вставки комбинации сенсора: {e}")
+            return False
 
     @lru_cache(maxsize=32)
     def list_all_analytes(self) -> List[Dict[str, Any]]:
@@ -311,6 +338,25 @@ class DatabaseManager:
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения мемристивных слоев: {e}")
             return []
+        
+    @lru_cache(maxsize=32)
+    def list_all_sensor_combinations(self) -> List[Dict[str, Any]]:
+        """Получение всех комбинаций сенсоров."""
+        query = """
+        SELECT Combo_ID, TA_ID, BRE_ID, IM_ID, MEM_ID, Score
+        FROM SensorCombinations
+        ORDER BY Combo_ID
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query)
+            columns = [description[0] for description in cursor.description]
+            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            self.logger.info(f"Получено {len(results)} комбинаций сенсоров")
+            return results
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка получения комбинаций сенсоров: {e}")
+            return []
 
     def list_all_analytes_paginated(self, limit: int, offset: int) -> List[Dict[str, Any]]:
         """Получение аналитов с пагинацией."""
@@ -386,6 +432,25 @@ class DatabaseManager:
             return results
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения мемристивных слоев с пагинацией: {e}")
+            return []
+    
+    def list_all_sensor_combinations_paginated(self, limit: int, offset: int) -> List[Dict[str, Any]]:
+        """Получение всех комбинаций сенсоров."""
+        query = """
+        SELECT Combo_ID, TA_ID, BRE_ID, IM_ID, MEM_ID, Score
+        FROM SensorCombinations
+        ORDER BY Combo_ID
+        LIMIT ? OFFSET ?
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query, (limit, offset))
+            columns = [description[0] for description in cursor.description]
+            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            self.logger.info(f"Получено {len(results)} комбинаций сенсоров (страница)")
+            return results
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка получения комбинаций сенсоров с пагинацией: {e}")
             return []
 
     def get_analyte_by_id(self, ta_id: str) -> Dict[str, Any]:
@@ -474,6 +539,7 @@ class DatabaseManager:
         self.list_all_bio_recognition_layers.cache_clear()
         self.list_all_immobilization_layers.cache_clear()
         self.list_all_memristive_layers.cache_clear()
+        self.list_all_sensor_combinations.cache_clear()
         self.logger.info("Кэш очищен")
 
     def close(self):
@@ -999,6 +1065,10 @@ class BiosensorGUI:
         except Exception as e:
             messagebox.showerror("Ошибка", f"Ошибка сохранения: {str(e)}\nПроверьте данные.")
             self.logger.error(f"Ошибка сохранения: {e}")
+            
+    def save_sensor_combinations_to_db(self):
+        
+        return 0
 
     def safe_float_convert(self, value_str: str, field_name: str, section: str) -> float:
         """Преобразование строки в float с валидацией."""
@@ -1272,6 +1342,31 @@ class BiosensorGUI:
                 layer.get('SN', '')
             ))
         self.update_pagination_buttons()
+    
+    """    
+    def show_sensor_combination(self):
+        Отображение комбинаций сенсоров с пагинацией.
+        self.current_data_type = 'sensor_combinations'
+        self.current_page = 0  # Сброс на первую страницу
+        self.tree.delete(*self.tree.get_children())
+        self.tree["columns"] = ("Combo_ID", "TA_ID", "BRE_ID", "IM_ID", "MEM_ID", "Score")
+        self.tree["show"] = "headings"
+        for col in self.tree["columns"]:
+            self.tree.heading(col, text=col)
+            self.tree.column(col, width=120)
+        offset = self.current_page * self.page_size
+        sensor_combinations = self.db_manager.list_all_sensor_combinations(self.page_size, offset)
+        for layer in sensor_combinations:
+            self.tree.insert("", "end", values=(
+                layer.get('Combo_ID', ''),
+                layer.get('TA_ID', ''),
+                layer.get('BRE_ID', ''),
+                layer.get('IM_ID', ''),
+                layer.get('MEM_ID', ''),
+                layer.get('Score', '')
+            ))
+        self.update_pagination_buttons()
+    """
 
     def refresh_data(self):
         """Обновление данных в зависимости от текущего типа."""
@@ -1310,13 +1405,45 @@ class BiosensorGUI:
         """Переход на следующую страницу."""
         self.current_page += 1
         self.refresh_data()
+        
+    def computing_combinations(self):
+        """рассчет и сохранение комбинаций сенсоров"""
+        analytes = self.db_manager.list_all_analytes()
+        bio_layers = self.db_manager.list_all_bio_recognition_layers()
+        im_layers = self.db_manager.list_all_immobilization_layers()
+        mem_layers = self.db_manager.list_all_memristive_layers()
+        
+        
 
     def show_best_combinations(self):
+        """Отображение комбинаций сенсоров с пагинацией."""
+        self.current_data_type = 'sensor_combinations'
+        self.current_page = 0  # Сброс на первую страницу
+        # рассчет и сохранение комбинаций
+        
+        # self.tree.delete(*self.tree.get_children())
+        # self.tree["columns"] = ("Combo_ID", "TA_ID", "BRE_ID", "IM_ID", "MEM_ID", "Score")
+        # self.tree["show"] = "headings"
+        # for col in self.tree["columns"]:
+        #    self.tree.heading(col, text=col)
+        #    self.tree.column(col, width=120)
+        offset = self.current_page * self.page_size
+        sensor_combinations = self.db_manager.list_all_sensor_combinations_paginated(self.page_size, offset)
+        self.update_pagination_buttons()
         """Отображение лучших комбинаций сенсоров."""
         self.analysis_text.delete(1.0, tk.END)
         self.analysis_text.insert(tk.END, "=== ЛУЧШИЕ КОМБИНАЦИИ БИОСЕНСОРОВ ===\n\n")
-        self.analysis_text.insert(tk.END, "Функция в разработке...\n")
-
+        for layer in sensor_combinations:
+            self.analysis_text.insert(tk.END, list(
+                layer.get('Combo_ID', ''),
+                layer.get('TA_ID', ''),
+                layer.get('BRE_ID', ''),
+                layer.get('IM_ID', ''),
+                layer.get('MEM_ID', ''),
+                layer.get('Score', '')
+            ))
+        """self.analysis_text.insert(tk.END, "Функция в разработке...\n")"""
+        
     def comparative_analysis(self):
         """Выполнение сравнительного анализа."""
         self.analysis_text.delete(1.0, tk.END)
