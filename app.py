@@ -6,5 +6,5 @@ from DB_6 import BiosensorGUI
 st.title("Название вашей программы")
 # input_data = st.text_input("Введите данные:")
 if st.button("Запустить"):
-    result = DB_6.BiosensorGUI().run()
+    result = BiosensorGUI().run()
     # st.write(result)
