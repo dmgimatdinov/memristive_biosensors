@@ -1,6 +1,6 @@
 
 import streamlit as st
-import DB_6
+from DB_6 import BiosensorGUI
 # импорт вашего основного кода
 
 st.title("Название вашей программы")
