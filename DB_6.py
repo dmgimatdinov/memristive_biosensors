@@ -1,11 +1,14 @@
-﻿import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+﻿#import tkinter as tk
+#from tkinter import ttk, messagebox, filedialog
 import sqlite3
-import re
+# import re
 from typing import Dict, Any, List
 import json
 from functools import lru_cache
 import logging
+
+import streamlit as st
+import atexit
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, filename='biosensor.log',
@@ -130,7 +133,7 @@ class DatabaseManager:
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка создания таблиц: {e}")
 
-    def insert_analyte(self, data: Dict[str, Any]) -> bool:
+    '''def insert_analyte(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена аналита с проверкой дубликатов."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT TA_ID FROM Analytes WHERE TA_ID = ?", (data['TA_ID'],))
@@ -153,9 +156,50 @@ class DatabaseManager:
             return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки аналита: {e}")
+            return False'''
+
+    # Streamlit-версия функции вставки аналита с проверкой дубликатов
+    def insert_analyte(self, data: Dict[str, Any]) -> bool:
+        """Вставка или замена аналита с проверкой дубликатов (Streamlit-версия)."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT TA_ID FROM Analytes WHERE TA_ID = ?", (data['TA_ID'],))
+        
+        if cursor.fetchone():
+            # В Streamlit используем st.warning + логику в callback вместо messagebox
+            st.warning(f"⚠️ Аналит {data['TA_ID']} уже существует")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Перезаписать", key=f"overwrite_analyte_{data['TA_ID']}"):
+                    st.session_state[f'confirm_overwrite_analyte_{data["TA_ID"]}'] = True
+            with col2:
+                if st.button("❌ Отмена", key=f"cancel_analyte_{data['TA_ID']}"):
+                    return False
+            
+            # Проверяем подтверждение
+            if not st.session_state.get(f'confirm_overwrite_analyte_{data["TA_ID"]}', False):
+                return False
+        
+        query = """
+        INSERT OR REPLACE INTO Analytes (TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, HL, PC)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor.execute(query, (
+                data['TA_ID'], data['TA_Name'], data.get('PH_Min'),
+                data.get('PH_Max'), data.get('T_Max'), data.get('ST'),
+                data.get('HL'), data.get('PC')
+            ))
+            self.conn.commit()
+            self.clear_cache()
+            self.logger.info(f"Аналит {data['TA_ID']} успешно вставлен")
+            st.success(f"✅ Аналит {data['TA_ID']} успешно сохранён")
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка вставки аналита: {e}")
+            st.error(f"❌ Ошибка вставки аналита: {e}")
             return False
 
-    def insert_bio_recognition_layer(self, data: Dict[str, Any]) -> bool:
+    '''def insert_bio_recognition_layer(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена биораспознающего слоя с проверкой дубликатов."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT BRE_ID FROM BioRecognitionLayers WHERE BRE_ID = ?", (data['BRE_ID'],))
@@ -180,9 +224,52 @@ class DatabaseManager:
             return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки биослоя: {e}")
+            return False'''
+
+    # Streamlit-версия функции вставки биораспознающего слоя с проверкой дубликатов
+    def insert_bio_recognition_layer(self, data: Dict[str, Any]) -> bool:
+        """Вставка или замена биораспознающего слоя с проверкой дубликатов (Streamlit-версия)."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT BRE_ID FROM BioRecognitionLayers WHERE BRE_ID = ?", (data['BRE_ID'],))
+        
+        if cursor.fetchone():
+            # В Streamlit используем st.warning + логику в callback вместо messagebox
+            st.warning(f"⚠️ Биослой {data['BRE_ID']} уже существует")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Перезаписать", key=f"overwrite_bio_{data['BRE_ID']}"):
+                    st.session_state[f'confirm_overwrite_bio_{data["BRE_ID"]}'] = True
+            with col2:
+                if st.button("❌ Отмена", key=f"cancel_bio_{data['BRE_ID']}"):
+                    return False
+            
+            # Проверяем подтверждение
+            if not st.session_state.get(f'confirm_overwrite_bio_{data["BRE_ID"]}', False):
+                return False
+        
+        query = """
+        INSERT OR REPLACE INTO BioRecognitionLayers 
+        (BRE_ID, BRE_Name, PH_Min, PH_Max, T_Min, T_Max, SN, DR_Min, DR_Max, RP, TR, ST, LOD, HL, PC)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor.execute(query, (
+                data['BRE_ID'], data['BRE_Name'], data.get('PH_Min'), data.get('PH_Max'),
+                data.get('T_Min'), data.get('T_Max'), data.get('SN'), data.get('DR_Min'),
+                data.get('DR_Max'), data.get('RP'), data.get('TR'), data.get('ST'),
+                data.get('LOD'), data.get('HL'), data.get('PC')
+            ))
+            self.conn.commit()
+            self.clear_cache()
+            self.logger.info(f"Биослой {data['BRE_ID']} успешно вставлен")
+            st.success(f"✅ Биослой {data['BRE_ID']} успешно сохранён")
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка вставки биослоя: {e}")
+            st.error(f"❌ Ошибка вставки биослоя: {e}")
             return False
 
-    def insert_immobilization_layer(self, data: Dict[str, Any]) -> bool:
+    '''def insert_immobilization_layer(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена иммобилизационного слоя с проверкой дубликатов."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT IM_ID FROM ImmobilizationLayers WHERE IM_ID = ?", (data['IM_ID'],))
@@ -207,8 +294,51 @@ class DatabaseManager:
             return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки иммобилизационного слоя: {e}")
-            return False
-
+            return False'''
+    
+    # Streamlit-версия функции вставки иммобилизационного слоя с проверкой дубликатов
+    def insert_immobilization_layer(self, data: Dict[str, Any]) -> bool:
+        """Вставка или замена иммобилизационного слоя с проверкой дубликатов (Streamlit-версия)."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT IM_ID FROM ImmobilizationLayers WHERE IM_ID = ?", (data['IM_ID'],))
+        
+        if cursor.fetchone():
+            # В Streamlit используем st.warning + логику в callback вместо messagebox
+                st.warning(f"⚠️ Иммобилизационный слой {data['IM_ID']} уже существует")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ Перезаписать", key=f"overwrite_immob_{data['IM_ID']}"):
+                        st.session_state[f'confirm_overwrite_immob_{data["IM_ID"]}'] = True
+                with col2:
+                    if st.button("❌ Отмена", key=f"cancel_immob_{data['IM_ID']}"):
+                        return False
+                
+                # Проверяем подтверждение
+                if not st.session_state.get(f'confirm_overwrite_immob_{data["IM_ID"]}', False):
+                    return False
+            
+            query = """
+            INSERT OR REPLACE INTO ImmobilizationLayers 
+            (IM_ID, IM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, Adh, Sol, K_IM, RP, TR, ST, HL, PC)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            try:
+                cursor.execute(query, (
+                    data['IM_ID'], data['IM_Name'], data.get('PH_Min'), data.get('PH_Max'),
+                    data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('Adh'),
+                    data.get('Sol'), data.get('K_IM'), data.get('RP'), data.get('TR'),
+                    data.get('ST'), data.get('HL'), data.get('PC')
+                ))
+                self.conn.commit()
+                self.clear_cache()
+                self.logger.info(f"Иммобилизационный слой {data['IM_ID']} успешно вставлен")
+                st.success(f"✅ Иммобилизационный слой {data['IM_ID']} успешно сохранён")
+                return True
+            except sqlite3.Error as e:
+                self.logger.error(f"Ошибка вставки иммобилизационного слоя: {e}")
+                st.error(f"❌ Ошибка вставки иммобилизационного слоя: {e}")
+                return False
+    
     def insert_memristive_layer(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена мемристивного слоя с проверкой дубликатов."""
         cursor = self.conn.cursor()
@@ -677,10 +807,13 @@ class BiosensorGUI:
     """GUI-приложение для управления паспортами мемристивных биосенсоров."""
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.root = tk.Tk()
-        self.root.title("Паспорта мемристивных биосенсоров v2.0")
-        self.root.geometry("1200x800")
-        self.root.configure(bg='#f0f0f0')
+        #self.root = tk.Tk()
+        #self.root.title("Паспорта мемристивных биосенсоров v2.0")
+        #self.root.geometry("1200x800")
+        #self.root.configure(bg='#f0f0f0')
+
+        st.set_page_config(page_title="Паспорта мемристивных биосенсоров v2.0", layout="wide")
+        st.title("Паспорта мемристивных биосенсоров v2.0")
 
         # Инициализация базы данных
         self.db_manager = DatabaseManager()
@@ -689,6 +822,11 @@ class BiosensorGUI:
         self.page_size = 50
         self.current_page = 0
         self.current_data_type = 'analytes'  # Для отслеживания текущего типа данных в Treeview
+
+        # Запись значений в session_state, чтобы они сохранялись между перерисовками Streamlit
+        st.session_state.setdefault('page_size', self.page_size)
+        st.session_state.setdefault('current_page', self.current_page)
+        st.session_state.setdefault('current_data_type', self.current_data_type)
 
         # Загрузка конфигурации или создание значений по умолчанию
         self.config = self.get_default_config()
@@ -817,8 +955,8 @@ class BiosensorGUI:
             ]
         }
 
-    def create_menu(self):
-        """Создание меню приложения."""
+    '''def create_menu(self):
+        # """Создание меню приложения."""
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
         file_menu = tk.Menu(menubar, tearoff=0)
@@ -833,15 +971,81 @@ class BiosensorGUI:
         tools_menu.add_command(label="Экспорт данных", command=self.export_data)
         help_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Справка", menu=help_menu)
-        help_menu.add_command(label="О программе", command=self.about)
+        help_menu.add_command(label="О программе", command=self.about)'''
+    
+    # streamlit
+    def create_menu(self):
+        # """Создание меню приложения для Streamlit."""
+    
+        # Создание боковой панели с меню
+        st.sidebar.title("Меню")
+    
+        # Раздел "Файл"
+        st.sidebar.subheader("📁 Файл")
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            if st.button("💾 Сохранить паспорт"):
+                self.save_passport()
+        with col2:
+            if st.button("📂 Загрузить паспорт"):
+                self.load_passport()
+    
+        st.sidebar.divider()
+    
+        # Раздел "Инструменты"
+        st.sidebar.subheader("🔧 Инструменты")
+        col3, col4 = st.sidebar.columns(2)
+        with col3:
+            if st.button("🗑️ Очистить форму"):
+                self.clear_form()
+        with col4:
+            if st.button("📊 Экспорт данных"):
+                self.export_data()
+    
+        st.sidebar.divider()
+    
+        # Раздел "Справка"
+        st.sidebar.subheader("❓ Справка")
+        if st.sidebar.button("ℹ️ О программе"):
+            self.about()
 
-    def create_notebook(self):
+    '''def create_notebook(self):
         """Создание вкладок интерфейса."""
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill='both', expand=True, padx=10, pady=10)
         style = ttk.Style()
-        style.configure('TNotebook.Tab', padding=[20, 8])
+        style.configure('TNotebook.Tab', padding=[20, 8])'''
 
+    # streamlit
+    def create_notebook(self):
+        """Создание вкладок интерфейса для Streamlit."""
+        # В Streamlit вкладки создаются через st.tabs() вместо ttk.Notebook
+        # Инициализируем session_state для управления активной вкладкой
+        st.session_state.setdefault('active_tab', 0)
+        
+        # Создаём три основные вкладки
+        tabs = st.tabs([
+            "🔬 Ввод паспортов",
+            "📊 База данных", 
+            "📈 Анализ"
+        ])
+        
+        # Сохраняем ссылки на вкладки для доступа из других методов
+        self.tab_data_entry = tabs[0]
+        self.tab_database = tabs[1]
+        self.tab_analysis = tabs[2]
+        
+        # Заполняем вкладки содержимым
+        with self.tab_data_entry:
+            self.create_data_entry_tab()
+        
+        with self.tab_database:
+            self.create_database_tab()
+        
+        with self.tab_analysis:
+            self.create_analysis_tab()    
+
+    '''
     def create_data_entry_tab(self):
         """Создание вкладки ввода паспортов."""
         self.entry_frame = ttk.Frame(self.notebook)
@@ -862,9 +1066,440 @@ class BiosensorGUI:
         self.create_control_buttons()
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))'''
 
-    def create_sections(self):
+    # streamlit
+    def create_data_entry_tab(self):
+        """Создание вкладки ввода паспортов для Streamlit."""
+        st.header("🔬 Ввод паспорта биосенсора v2.0")
+        
+        # Создаём контейнер с прокруткой (Streamlit имеет встроенную прокрутку)
+        with st.container():
+            # Создаём две колонки для макета
+            col1, col2 = st.columns(2)
+            
+            # Левая колонка - Аналит и Биослой
+            with col1:
+                st.subheader("🎯 Целевой аналит (TA)")
+                analyte_vars = {}
+                analyte_vars['ta_id'] = st.text_input(
+                    "ID аналита",
+                    key="analyte_ta_id",
+                    help="Например: TA001"
+                )
+                analyte_vars['ta_name'] = st.text_input(
+                    "Название",
+                    key="analyte_ta_name",
+                    help="Полное название аналита"
+                )
+                col_ph_a1, col_ph_a2 = st.columns(2)
+                with col_ph_a1:
+                    analyte_vars['ph_min'] = st.number_input(
+                        "pH минимум",
+                        min_value=2.0,
+                        max_value=10.0,
+                        key="analyte_ph_min",
+                        help="2.0 — 10.0"
+                    )
+                with col_ph_a2:
+                    analyte_vars['ph_max'] = st.number_input(
+                        "pH максимум",
+                        min_value=2.0,
+                        max_value=10.0,
+                        key="analyte_ph_max",
+                        help="2.0 — 10.0"
+                    )
+                analyte_vars['t_max'] = st.number_input(
+                    "Макс. температура (°C)",
+                    min_value=0,
+                    max_value=180,
+                    key="analyte_t_max",
+                    help="0-180"
+                )
+                analyte_vars['stability'] = st.number_input(
+                    "Стабильность (дни)",
+                    min_value=0,
+                    max_value=365,
+                    key="analyte_stability",
+                    help="0-365"
+                )
+                analyte_vars['half_life'] = st.number_input(
+                    "Период полураспада (ч)",
+                    min_value=0,
+                    max_value=8760,
+                    key="analyte_half_life",
+                    help="0-8760"
+                )
+                analyte_vars['power_consumption'] = st.number_input(
+                    "Энергопотребление (мВт)",
+                    min_value=0,
+                    max_value=1000,
+                    key="analyte_power_consumption",
+                    help="0-1000"
+                )
+                
+                st.divider()
+                
+                st.subheader("🔴 Биораспознающий слой (BRE)")
+                bio_vars = {}
+                bio_vars['bre_id'] = st.text_input(
+                    "ID биослоя",
+                    key="bio_bre_id",
+                    help="Например: BRE001"
+                )
+                bio_vars['bre_name'] = st.text_input(
+                    "Название",
+                    key="bio_bre_name",
+                    help="Тип биослоя"
+                )
+                col_ph_b1, col_ph_b2 = st.columns(2)
+                with col_ph_b1:
+                    bio_vars['ph_min'] = st.number_input(
+                        "pH минимум",
+                        min_value=2.0,
+                        max_value=10.0,
+                        key="bio_ph_min",
+                        help="2.0 — 10.0"
+                    )
+                with col_ph_b2:
+                    bio_vars['ph_max'] = st.number_input(
+                        "pH максимум",
+                        min_value=2.0,
+                        max_value=10.0,
+                        key="bio_ph_max",
+                        help="2.0 — 10.0"
+                    )
+                col_t_b1, col_t_b2 = st.columns(2)
+                with col_t_b1:
+                    bio_vars['t_min'] = st.number_input(
+                        "Температура минимум (°C)",
+                        min_value=4,
+                        max_value=120,
+                        key="bio_t_min",
+                        help="4 — 120"
+                    )
+                with col_t_b2:
+                    bio_vars['t_max'] = st.number_input(
+                        "Температура максимум (°C)",
+                        min_value=4,
+                        max_value=120,
+                        key="bio_t_max",
+                        help="4 — 120"
+                    )
+                col_dr_b1, col_dr_b2 = st.columns(2)
+                with col_dr_b1:
+                    bio_vars['dr_min'] = st.number_input(
+                        "Диапазон минимум (пМ)",
+                        min_value=0.1,
+                        max_value=1e12,
+                        key="bio_dr_min",
+                        help="0.1 — 1*10^12"
+                    )
+                with col_dr_b2:
+                    bio_vars['dr_max'] = st.number_input(
+                        "Диапазон максимум (пМ)",
+                        min_value=0.1,
+                        max_value=1e12,
+                        key="bio_dr_max",
+                        help="0.1 — 1*10^12"
+                    )
+                bio_vars['sensitivity'] = st.number_input(
+                    "Чувствительность (мкА/(мкМ*см²))",
+                    min_value=0.0,
+                    max_value=20000.0,
+                    key="bio_sensitivity",
+                    help="0.01 — 1000"
+                )
+                bio_vars['reproducibility'] = st.number_input(
+                    "Воспроизводимость (%)",
+                    min_value=0,
+                    max_value=100,
+                    key="bio_reproducibility",
+                    help="0-100"
+                )
+                bio_vars['response_time'] = st.number_input(
+                    "Время отклика (с)",
+                    min_value=0,
+                    max_value=3600,
+                    key="bio_response_time",
+                    help="0-3600"
+                )
+                bio_vars['stability'] = st.number_input(
+                    "Стабильность (дни)",
+                    min_value=0,
+                    max_value=365,
+                    key="bio_stability",
+                    help="0-365"
+                )
+                bio_vars['lod'] = st.number_input(
+                    "Предел обнаружения (нМ)",
+                    min_value=0,
+                    max_value=100000,
+                    key="bio_lod",
+                    help="0-100000"
+                )
+                bio_vars['durability'] = st.number_input(
+                    "Долговечность (ч)",
+                    min_value=0,
+                    max_value=100000,
+                    key="bio_durability",
+                    help="0-100000"
+                )
+                bio_vars['power_consumption'] = st.number_input(
+                    "Энергопотребление (мВт)",
+                    min_value=0,
+                    max_value=1000,
+                    key="bio_power_consumption",
+                    help="0-1000"
+                )
+            
+            # Правая колонка - Иммобилизация и Мемристор
+            with col2:
+                st.subheader("🟡 Иммобилизационный слой (IM)")
+                immob_vars = {}
+                immob_vars['im_id'] = st.text_input(
+                    "ID иммобилизации",
+                    key="immob_im_id",
+                    help="Например: IM001"
+                )
+                immob_vars['im_name'] = st.text_input(
+                    "Название",
+                    key="immob_im_name",
+                    help="Тип иммобилизации"
+                )
+                col_ph_i1, col_ph_i2 = st.columns(2)
+                with col_ph_i1:
+                    immob_vars['ph_min'] = st.number_input(
+                        "pH минимум",
+                        min_value=2.0,
+                        max_value=10.0,
+                        key="immob_ph_min",
+                        help="2.0 — 10.0"
+                    )
+                with col_ph_i2:
+                    immob_vars['ph_max'] = st.number_input(
+                        "pH максимум",
+                        min_value=2.0,
+                        max_value=10.0,
+                        key="immob_ph_max",
+                        help="2.0 — 10.0"
+                    )
+                col_t_i1, col_t_i2 = st.columns(2)
+                with col_t_i1:
+                    immob_vars['t_min'] = st.number_input(
+                        "Температура минимум (°C)",
+                        min_value=4,
+                        max_value=120,
+                        key="immob_t_min",
+                        help="4 — 95"
+                    )
+                with col_t_i2:
+                    immob_vars['t_max'] = st.number_input(
+                        "Температура максимум (°C)",
+                        min_value=4,
+                        max_value=120,
+                        key="immob_t_max",
+                        help="4 — 95"
+                    )
+                immob_vars['young_modulus'] = st.number_input(
+                    "Модуль Юнга (ГПа)",
+                    min_value=0,
+                    max_value=1000,
+                    key="immob_young_modulus",
+                    help="0-1000"
+                )
+                immob_vars['adhesion'] = st.selectbox(
+                    "Адгезия",
+                    ["низкая", "средняя", "высокая"],
+                    key="immob_adhesion",
+                    help="Уровень адгезии"
+                )
+                immob_vars['solubility'] = st.selectbox(
+                    "Растворимость",
+                    ["низкая", "средняя", "высокая"],
+                    key="immob_solubility",
+                    help="Уровень растворимости"
+                )
+                immob_vars['loss_coefficient'] = st.number_input(
+                    "Коэффициент потерь",
+                    min_value=0.0,
+                    max_value=1.0,
+                    key="immob_loss_coefficient",
+                    help="0-1"
+                )
+                immob_vars['reproducibility'] = st.number_input(
+                    "Воспроизводимость (%)",
+                    min_value=0,
+                    max_value=100,
+                    key="immob_reproducibility",
+                    help="0-100"
+                )
+                immob_vars['response_time'] = st.number_input(
+                    "Время отклика (с)",
+                    min_value=0,
+                    max_value=3600,
+                    key="immob_response_time",
+                    help="0-3600"
+                )
+                immob_vars['stability'] = st.number_input(
+                    "Стабильность (дни)",
+                    min_value=0,
+                    max_value=365,
+                    key="immob_stability",
+                    help="0-365"
+                )
+                immob_vars['durability'] = st.number_input(
+                    "Долговечность (ч)",
+                    min_value=0,
+                    max_value=8760,
+                    key="immob_durability",
+                    help="0-8760"
+                )
+                immob_vars['power_consumption'] = st.number_input(
+                    "Энергопотребление (мВт)",
+                    min_value=0,
+                    max_value=1000,
+                    key="immob_power_consumption",
+                    help="0-1000"
+                )
+                
+                st.divider()
+                
+                st.subheader("🟣 Мемристивный слой (MEM)")
+                mem_vars = {}
+                mem_vars['mem_id'] = st.text_input(
+                    "ID мемристора",
+                    key="mem_mem_id",
+                    help="Например: MEM001"
+                )
+                mem_vars['mem_name'] = st.text_input(
+                    "Название",
+                    key="mem_mem_name",
+                    help="Тип мемристора"
+                )
+                col_ph_m1, col_ph_m2 = st.columns(2)
+                with col_ph_m1:
+                    mem_vars['ph_min'] = st.number_input(
+                        "pH минимум",
+                        min_value=2.0,
+                        max_value=10.0,
+                        key="mem_ph_min",
+                        help="2.0 — 10.0"
+                    )
+                with col_ph_m2:
+                    mem_vars['ph_max'] = st.number_input(
+                        "pH максимум",
+                        min_value=2.0,
+                        max_value=10.0,
+                        key="mem_ph_max",
+                        help="2.0 — 10.0"
+                    )
+                col_t_m1, col_t_m2 = st.columns(2)
+                with col_t_m1:
+                    mem_vars['t_min'] = st.number_input(
+                        "Температура минимум (°C)",
+                        min_value=5,
+                        max_value=120,
+                        key="mem_t_min",
+                        help="5 — 100"
+                    )
+                with col_t_m2:
+                    mem_vars['t_max'] = st.number_input(
+                        "Температура максимум (°C)",
+                        min_value=5,
+                        max_value=120,
+                        key="mem_t_max",
+                        help="5 — 100"
+                    )
+                col_dr_m1, col_dr_m2 = st.columns(2)
+                with col_dr_m1:
+                    mem_vars['dr_min'] = st.number_input(
+                        "Диапазон минимум (пМ)",
+                        min_value=1e-7,
+                        max_value=1e11,
+                        key="mem_dr_min",
+                        help="0.0000001 — 1*10^11"
+                    )
+                with col_dr_m2:
+                    mem_vars['dr_max'] = st.number_input(
+                        "Диапазон максимум (пМ)",
+                        min_value=1e-7,
+                        max_value=1e11,
+                        key="mem_dr_max",
+                        help="0.0000001 — 1*10^11"
+                    )
+                mem_vars['young_modulus'] = st.number_input(
+                    "Модуль Юнга (ГПа)",
+                    min_value=0,
+                    max_value=1000,
+                    key="mem_young_modulus",
+                    help="0-1000"
+                )
+                mem_vars['sensitivity'] = st.number_input(
+                    "Чувствительность (мВ/dec)",
+                    min_value=0.0,
+                    max_value=1000.0,
+                    key="mem_sensitivity",
+                    help="0-1000"
+                )
+                mem_vars['reproducibility'] = st.number_input(
+                    "Воспроизводимость (%)",
+                    min_value=0,
+                    max_value=100,
+                    key="mem_reproducibility",
+                    help="0-100"
+                )
+                mem_vars['response_time'] = st.number_input(
+                    "Время отклика (с)",
+                    min_value=0,
+                    max_value=3600,
+                    key="mem_response_time",
+                    help="0-3600"
+                )
+                mem_vars['stability'] = st.number_input(
+                    "Стабильность (дни)",
+                    min_value=0,
+                    max_value=365,
+                    key="mem_stability",
+                    help="0-365"
+                )
+                mem_vars['lod'] = st.number_input(
+                    "Предел обнаружения (нМ)",
+                    min_value=0,
+                    max_value=100000,
+                    key="mem_lod",
+                    help="0-1*10^5"
+                )
+                mem_vars['durability'] = st.number_input(
+                    "Долговечность (ч)",
+                    min_value=0,
+                    max_value=100000,
+                    key="mem_durability",
+                    help="0-8760"
+                )
+                mem_vars['power_consumption'] = st.number_input(
+                    "Энергопотребление (мВт)",
+                    min_value=0,
+                    max_value=1000,
+                    key="mem_power_consumption",
+                    help="0-1000"
+                )
+        
+        # Кнопки управления в нижней части
+        st.divider()
+        btn_col1, btn_col2, btn_col3 = st.columns(3)
+        with btn_col1:
+            if st.button("💾 Сохранить паспорт", key="save_btn", use_container_width=True):
+                st.info("✅ Паспорт сохранён в базу данных")
+        with btn_col2:
+            if st.button("🗑️ Очистить форму", key="clear_btn", use_container_width=True):
+                st.info("✅ Форма очищена")
+        with btn_col3:
+            if st.button("📁 Загрузить паспорт", key="load_btn", use_container_width=True):
+                st.info("✅ Паспорт загружен из БД")    
+
+    # В Streamlit метод create_sections() уже не нужен, так как вся логика ввода перенесена в create_data_entry_tab(). 
+    '''def create_sections(self):
         """Создание секций ввода из конфигурации."""
         self.sections['analyte'] = AnalyteSection(self.scrollable_frame, self.config['analyte'])
         self.sections['analyte'].frame.grid(row=0, column=0, padx=10, pady=10, sticky='nsew')
@@ -874,7 +1509,10 @@ class BiosensorGUI:
         self.sections['immobilization'].frame.grid(row=1, column=0, padx=10, pady=10, sticky='nsew')
         self.sections['memristive'] = MemristiveSection(self.scrollable_frame, self.config['memristive'])
         self.sections['memristive'].frame.grid(row=1, column=1, padx=10, pady=10, sticky='nsew')
-
+    '''
+    
+    # реализовано в create_data_entry_tab()
+    '''
     def create_control_buttons(self):
         """Создание кнопок управления."""
         button_frame = tk.Frame(self.scrollable_frame, bg='#f0f0f0')
@@ -885,7 +1523,9 @@ class BiosensorGUI:
                   bg='#f44336', fg='white', font=('Arial', 12, 'bold'), padx=20, pady=10).pack(side='left', padx=10)
         tk.Button(button_frame, text="📁 Загрузить паспорт", command=self.load_passport_from_db,
                   bg='#2196F3', fg='white', font=('Arial', 12, 'bold'), padx=20, pady=10).pack(side='left', padx=10)
-
+    '''
+    
+    '''
     def create_database_tab(self):
         """Создание вкладки базы данных."""
         self.db_frame = ttk.Frame(self.notebook)
@@ -909,8 +1549,94 @@ class BiosensorGUI:
         self.tree.pack(fill='both', expand=True, padx=10, pady=10)
         scrollbar_tree = ttk.Scrollbar(self.db_frame, orient='vertical', command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar_tree.set)
-        scrollbar_tree.pack(side='right', fill='y')
+        scrollbar_tree.pack(side='right', fill='y')'''
 
+    # streamlit
+    def create_database_tab(self):
+        """Создание вкладки базы данных для Streamlit."""
+        st.header("📊 База данных биосенсоров")
+        
+        # Кнопки для выбора типа данных
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1:
+            if st.button("🎯 TA (аналиты)", use_container_width=True):
+                st.session_state.current_data_type = 'analytes'
+                st.session_state.current_page = 0
+        with col2:
+            if st.button("🔴 BRE (биослои)", use_container_width=True):
+                st.session_state.current_data_type = 'bio_layers'
+                st.session_state.current_page = 0
+        with col3:
+            if st.button("🟡 IM (иммобилизация)", use_container_width=True):
+                st.session_state.current_data_type = 'immobilization_layers'
+                st.session_state.current_page = 0
+        with col4:
+            if st.button("🟣 MEM (мемристоры)", use_container_width=True):
+                st.session_state.current_data_type = 'memristive_layers'
+                st.session_state.current_page = 0
+        with col5:
+            if st.button("🔄 Обновить", use_container_width=True):
+                st.rerun()
+        
+        st.divider()
+        
+        # Пагинация
+        page_size = st.number_input("Записей на странице:", min_value=5, max_value=100, value=20)
+        current_page = st.session_state.get('current_page', 0)
+        current_data_type = st.session_state.get('current_data_type', 'analytes')
+        
+        # Получение данных в зависимости от типа
+        offset = current_page * page_size
+        
+        if current_data_type == 'analytes':
+            data = self.db_manager.list_all_analytes_paginated(page_size, offset)
+            columns = ["TA_ID", "TA_Name", "PH_Min", "PH_Max", "T_Max", "ST"]
+            title = "📋 Аналиты"
+        elif current_data_type == 'bio_layers':
+            data = self.db_manager.list_all_bio_recognition_layers_paginated(page_size, offset)
+            columns = ["BRE_ID", "BRE_Name", "PH_Min", "PH_Max", "T_Min", "T_Max", "SN"]
+            title = "🔴 Биораспознающие слои"
+        elif current_data_type == 'immobilization_layers':
+            data = self.db_manager.list_all_immobilization_layers_paginated(page_size, offset)
+            columns = ["IM_ID", "IM_Name", "PH_Min", "PH_Max", "T_Min", "T_Max", "MP"]
+            title = "🟡 Иммобилизационные слои"
+        elif current_data_type == 'memristive_layers':
+            data = self.db_manager.list_all_memristive_layers_paginated(page_size, offset)
+            columns = ["MEM_ID", "MEM_Name", "PH_Min", "PH_Max", "T_Min", "T_Max", "SN"]
+            title = "🟣 Мемристивные слои"
+        else:
+            data = []
+            columns = []
+            title = "Данные не найдены"
+        
+        st.subheader(title)
+        
+        # Отображение таблицы
+        if data:
+            df = __import__('pandas').DataFrame(data)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("Нет данных для отображения на этой странице.")
+        
+        # Навигация по страницам
+        st.divider()
+        col_prev, col_page, col_next = st.columns(3)
+        
+        with col_prev:
+            if st.button("◀ Предыдущая", use_container_width=True, disabled=(current_page == 0)):
+                st.session_state.current_page = max(0, current_page - 1)
+                st.rerun()
+        
+        with col_page:
+            st.write(f"**Страница {current_page + 1}**", unsafe_allow_html=True)
+        
+        with col_next:
+            if st.button("Следующая ▶", use_container_width=True, disabled=(len(data) < page_size)):
+                st.session_state.current_page = current_page + 1
+                st.rerun()
+        
+
+    '''
     def create_analysis_tab(self):
         """Создание вкладки анализа."""
         self.analysis_frame = ttk.Frame(self.notebook)
@@ -931,9 +1657,40 @@ class BiosensorGUI:
         scrollbar_analysis = ttk.Scrollbar(self.analysis_frame, orient='vertical',
                                           command=self.analysis_text.yview)
         self.analysis_text.configure(yscrollcommand=scrollbar_analysis.set)
-        scrollbar_analysis.pack(side='right', fill='y')
+        scrollbar_analysis.pack(side='right', fill='y')'''
+    
+    # streamlit
+    def create_analysis_tab(self):
+        """Создание вкладки анализа для Streamlit."""
+        st.header("📈 Анализ характеристик")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("🏆 Лучшие комбинации", use_container_width=True):
+                self.show_best_combinations()
+        
+        with col2:
+            if st.button("📊 Сравнительный анализ", use_container_width=True):
+                self.comparative_analysis()
+        
+        with col3:
+            if st.button("📈 Статистика", use_container_width=True):
+                self.show_statistics()
+        
+        st.divider()
+        
+        # Область для вывода результатов анализа
+        st.session_state.setdefault('analysis_result', "Выберите тип анализа...")
+        st.text_area(
+            "Результаты анализа:",
+            value=st.session_state.get('analysis_result', ''),
+            height=300,
+            disabled=True
+        )
 
-    def save_passport_to_db(self):
+
+    '''def save_passport_to_db(self):
         """Сохранение всех паспортов в базу данных."""
         try:
             # Сохранение аналита
@@ -1064,13 +1821,114 @@ class BiosensorGUI:
             messagebox.showinfo("Успех", "Паспорт успешно сохранен!")
         except Exception as e:
             messagebox.showerror("Ошибка", f"Ошибка сохранения: {str(e)}\nПроверьте данные.")
-            self.logger.error(f"Ошибка сохранения: {e}")
+            self.logger.error(f"Ошибка сохранения: {e}")'''
+    
+    # streamlit
+    def save_passport_to_db_streamlit(self):
+        """Сохранение паспорта в БД из Streamlit-форм."""
+        try:
+            # Сохранение аналита
+            analyte_data = {
+                'TA_ID': st.session_state.get('analyte_ta_id', ''),
+                'TA_Name': st.session_state.get('analyte_ta_name', ''),
+                'PH_Min': st.session_state.get('analyte_ph_min'),
+                'PH_Max': st.session_state.get('analyte_ph_max'),
+                'T_Max': st.session_state.get('analyte_t_max'),
+                'ST': st.session_state.get('analyte_stability'),
+                'HL': st.session_state.get('analyte_half_life'),
+                'PC': st.session_state.get('analyte_power_consumption')
+            }
+            
+            if analyte_data['TA_ID']:
+                if self.db_manager.insert_analyte(analyte_data):
+                    st.success("✅ Аналит сохранён")
+                    self.logger.info(f"Аналит {analyte_data['TA_ID']} сохранён")
+            
+            # Сохранение биораспознающего слоя
+            bio_data = {
+                'BRE_ID': st.session_state.get('bio_bre_id', ''),
+                'BRE_Name': st.session_state.get('bio_bre_name', ''),
+                'PH_Min': st.session_state.get('bio_ph_min'),
+                'PH_Max': st.session_state.get('bio_ph_max'),
+                'T_Min': st.session_state.get('bio_t_min'),
+                'T_Max': st.session_state.get('bio_t_max'),
+                'SN': st.session_state.get('bio_sensitivity'),
+                'DR_Min': st.session_state.get('bio_dr_min'),
+                'DR_Max': st.session_state.get('bio_dr_max'),
+                'RP': st.session_state.get('bio_reproducibility'),
+                'TR': st.session_state.get('bio_response_time'),
+                'ST': st.session_state.get('bio_stability'),
+                'LOD': st.session_state.get('bio_lod'),
+                'HL': st.session_state.get('bio_durability'),
+                'PC': st.session_state.get('bio_power_consumption')
+            }
+            
+            if bio_data['BRE_ID']:
+                if self.db_manager.insert_bio_recognition_layer(bio_data):
+                    st.success("✅ Биораспознающий слой сохранён")
+                    self.logger.info(f"Биослой {bio_data['BRE_ID']} сохранён")
+            
+            # Сохранение иммобилизационного слоя
+            immob_data = {
+                'IM_ID': st.session_state.get('immob_im_id', ''),
+                'IM_Name': st.session_state.get('immob_im_name', ''),
+                'PH_Min': st.session_state.get('immob_ph_min'),
+                'PH_Max': st.session_state.get('immob_ph_max'),
+                'T_Min': st.session_state.get('immob_t_min'),
+                'T_Max': st.session_state.get('immob_t_max'),
+                'MP': st.session_state.get('immob_young_modulus'),
+                'Adh': st.session_state.get('immob_adhesion', ''),
+                'Sol': st.session_state.get('immob_solubility', ''),
+                'K_IM': st.session_state.get('immob_loss_coefficient'),
+                'RP': st.session_state.get('immob_reproducibility'),
+                'TR': st.session_state.get('immob_response_time'),
+                'ST': st.session_state.get('immob_stability'),
+                'HL': st.session_state.get('immob_durability'),
+                'PC': st.session_state.get('immob_power_consumption')
+            }
+            
+            if immob_data['IM_ID']:
+                if self.db_manager.insert_immobilization_layer(immob_data):
+                    st.success("✅ Иммобилизационный слой сохранён")
+                    self.logger.info(f"Иммобилизационный слой {immob_data['IM_ID']} сохранён")
+            
+            # Сохранение мемристивного слоя
+            mem_data = {
+                'MEM_ID': st.session_state.get('mem_mem_id', ''),
+                'MEM_Name': st.session_state.get('mem_mem_name', ''),
+                'PH_Min': st.session_state.get('mem_ph_min'),
+                'PH_Max': st.session_state.get('mem_ph_max'),
+                'T_Min': st.session_state.get('mem_t_min'),
+                'T_Max': st.session_state.get('mem_t_max'),
+                'MP': st.session_state.get('mem_young_modulus'),
+                'SN': st.session_state.get('mem_sensitivity'),
+                'DR_Min': st.session_state.get('mem_dr_min'),
+                'DR_Max': st.session_state.get('mem_dr_max'),
+                'RP': st.session_state.get('mem_reproducibility'),
+                'TR': st.session_state.get('mem_response_time'),
+                'ST': st.session_state.get('mem_stability'),
+                'LOD': st.session_state.get('mem_lod'),
+                'HL': st.session_state.get('mem_durability'),
+                'PC': st.session_state.get('mem_power_consumption')
+            }
+            
+            if mem_data['MEM_ID']:
+                if self.db_manager.insert_memristive_layer(mem_data):
+                    st.success("✅ Мемристивный слой сохранён")
+                    self.logger.info(f"Мемристивный слой {mem_data['MEM_ID']} сохранён")
+            
+            st.success("✅ Все паспорты успешно сохранены!")
+            
+        except Exception as e:
+            st.error(f"❌ Ошибка сохранения: {str(e)}")
+            self.logger.error(f"Ошибка сохранения паспортов: {e}")
+
             
     def save_sensor_combinations_to_db(self):
         
         return 0
 
-    def safe_float_convert(self, value_str: str, field_name: str, section: str) -> float:
+    '''def safe_float_convert(self, value_str: str, field_name: str, section: str) -> float:
         """Преобразование строки в float с валидацией."""
         if not value_str or value_str.strip() == "":
             messagebox.showerror("Неверный ввод", f"Пустое значение для {field_name}")
@@ -1085,16 +1943,24 @@ class BiosensorGUI:
         except ValueError as e:
             messagebox.showerror("Неверный ввод", f"Ошибка в {field_name}: {str(e)}")
             self.logger.error(f"Ошибка преобразования числа для {field_name}: {e}")
-            return None
+            return None'''
 
-    def clear_form(self):
+    '''def clear_form(self):
         """Очистка всех форм ввода."""
         for section in self.sections.values():
             for var in section.get_vars().values():
                 var.set("")
-        messagebox.showinfo("Очистка", "Форма очищена!")
+        messagebox.showinfo("Очистка", "Форма очищена!")'''
 
-    def save_passport(self):
+    
+    # streamlit
+    def clear_form_streamlit(self):
+        """Очистка формы (перезагрузка страницы)."""
+        st.session_state.clear()
+        st.info("✅ Форма очищена. Страница перезагружена.")
+        st.rerun()
+
+    '''def save_passport(self):
         """Сохранение паспорта в JSON-файл."""
         data = {name: {k: v.get() for k, v in section.get_vars().items()} for name, section in self.sections.items()}
         filename = filedialog.asksaveasfilename(
@@ -1126,8 +1992,9 @@ class BiosensorGUI:
             except Exception as e:
                 messagebox.showerror("Ошибка", f"Ошибка загрузки: {str(e)}")
                 self.logger.error(f"Ошибка загрузки: {e}")
+        '''
 
-    def load_passport_from_db(self):
+    '''def load_passport_from_db(self):
         """Загрузка паспорта из базы данных для выбранного типа данных."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Выбор паспорта")
@@ -1247,8 +2114,122 @@ class BiosensorGUI:
             dialog.destroy()
 
         tk.Button(dialog, text="Загрузить", command=load_selected).pack(pady=10)
+    '''
 
-    def show_analytes(self):
+    # streamlit
+    def load_passport_from_db_streamlit(self):
+        """Загрузка паспорта из БД для Streamlit."""
+        st.subheader("📂 Загрузить паспорт из БД")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            data_type = st.selectbox(
+                "Выберите тип данных",
+                ["Аналит (TA)", "Биослой (BRE)", "Иммобилизация (IM)", "Мемристор (MEM)"],
+                key="load_data_type"
+            )
+        
+        with col2:
+            layer_id = st.text_input("Введите ID", key="load_layer_id")
+        
+        if st.button("📥 Загрузить", key="load_execute_btn", use_container_width=True):
+            if not layer_id:
+                st.error("❌ Введите ID!")
+                return
+            
+            try:
+                if data_type == "Аналит (TA)":
+                    data = self.db_manager.get_analyte_by_id(layer_id)
+                    if data:
+                        st.session_state['analyte_ta_id'] = data['TA_ID']
+                        st.session_state['analyte_ta_name'] = data['TA_Name'] or ''
+                        st.session_state['analyte_ph_min'] = data['PH_Min']
+                        st.session_state['analyte_ph_max'] = data['PH_Max']
+                        st.session_state['analyte_t_max'] = data['T_Max']
+                        st.session_state['analyte_stability'] = data['ST']
+                        st.session_state['analyte_half_life'] = data['HL']
+                        st.session_state['analyte_power_consumption'] = data['PC']
+                        st.success("✅ Аналит загружен!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Аналит не найден!")
+                
+                elif data_type == "Биослой (BRE)":
+                    data = self.db_manager.get_bio_recognition_layer_by_id(layer_id)
+                    if data:
+                        st.session_state['bio_bre_id'] = data['BRE_ID']
+                        st.session_state['bio_bre_name'] = data['BRE_Name'] or ''
+                        st.session_state['bio_ph_min'] = data['PH_Min']
+                        st.session_state['bio_ph_max'] = data['PH_Max']
+                        st.session_state['bio_t_min'] = data['T_Min']
+                        st.session_state['bio_t_max'] = data['T_Max']
+                        st.session_state['bio_sensitivity'] = data['SN']
+                        st.session_state['bio_dr_min'] = data['DR_Min']
+                        st.session_state['bio_dr_max'] = data['DR_Max']
+                        st.session_state['bio_reproducibility'] = data['RP']
+                        st.session_state['bio_response_time'] = data['TR']
+                        st.session_state['bio_stability'] = data['ST']
+                        st.session_state['bio_lod'] = data['LOD']
+                        st.session_state['bio_durability'] = data['HL']
+                        st.session_state['bio_power_consumption'] = data['PC']
+                        st.success("✅ Биослой загружен!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Биослой не найден!")
+                
+                elif data_type == "Иммобилизация (IM)":
+                    data = self.db_manager.get_immobilization_layer_by_id(layer_id)
+                    if data:
+                        st.session_state['immob_im_id'] = data['IM_ID']
+                        st.session_state['immob_im_name'] = data['IM_Name'] or ''
+                        st.session_state['immob_ph_min'] = data['PH_Min']
+                        st.session_state['immob_ph_max'] = data['PH_Max']
+                        st.session_state['immob_t_min'] = data['T_Min']
+                        st.session_state['immob_t_max'] = data['T_Max']
+                        st.session_state['immob_young_modulus'] = data['MP']
+                        st.session_state['immob_adhesion'] = data['Adh'] or ''
+                        st.session_state['immob_solubility'] = data['Sol'] or ''
+                        st.session_state['immob_loss_coefficient'] = data['K_IM']
+                        st.session_state['immob_reproducibility'] = data['RP']
+                        st.session_state['immob_response_time'] = data['TR']
+                        st.session_state['immob_stability'] = data['ST']
+                        st.session_state['immob_durability'] = data['HL']
+                        st.session_state['immob_power_consumption'] = data['PC']
+                        st.success("✅ Иммобилизационный слой загружен!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Иммобилизационный слой не найден!")
+                
+                elif data_type == "Мемристор (MEM)":
+                    data = self.db_manager.get_memristive_layer_by_id(layer_id)
+                    if data:
+                        st.session_state['mem_mem_id'] = data['MEM_ID']
+                        st.session_state['mem_mem_name'] = data['MEM_Name'] or ''
+                        st.session_state['mem_ph_min'] = data['PH_Min']
+                        st.session_state['mem_ph_max'] = data['PH_Max']
+                        st.session_state['mem_t_min'] = data['T_Min']
+                        st.session_state['mem_t_max'] = data['T_Max']
+                        st.session_state['mem_young_modulus'] = data['MP']
+                        st.session_state['mem_sensitivity'] = data['SN']
+                        st.session_state['mem_dr_min'] = data['DR_Min']
+                        st.session_state['mem_dr_max'] = data['DR_Max']
+                        st.session_state['mem_reproducibility'] = data['RP']
+                        st.session_state['mem_response_time'] = data['TR']
+                        st.session_state['mem_stability'] = data['ST']
+                        st.session_state['mem_lod'] = data['LOD']
+                        st.session_state['mem_durability'] = data['HL']
+                        st.session_state['mem_power_consumption'] = data['PC']
+                        st.success("✅ Мемристивный слой загружен!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Мемристивный слой не найден!")
+            
+            except Exception as e:
+                st.error(f"❌ Ошибка загрузки: {str(e)}")
+                self.logger.error(f"Ошибка загрузки паспорта: {e}")
+
+    '''def show_analytes(self):
         """Отображение аналитов с пагинацией."""
         self.current_data_type = 'analytes'
         self.current_page = 0  # Сброс на первую страницу
@@ -1269,9 +2250,44 @@ class BiosensorGUI:
                 analyte.get('T_Max', ''),
                 analyte.get('ST', '')
             ))
-        self.update_pagination_buttons()
+        self.update_pagination_buttons()'''
 
-    def show_bio_layers(self):
+    # streamlit
+    def show_analytes(self):
+        """Streamlit-версия: отображение аналитов с пагинацией."""
+        st.session_state['current_data_type'] = 'analytes'
+        # сброс на первую страницу при явном вызове
+        st.session_state.setdefault('current_page', 0)
+        page_size = st.session_state.get('page_size', self.page_size)
+        current_page = st.session_state.get('current_page', 0)
+        offset = current_page * page_size
+
+        analytes = self.db_manager.list_all_analytes_paginated(page_size, offset)
+
+        st.subheader("📋 Аналиты")
+        if analytes:
+            df = __import__('pandas').DataFrame(analytes)
+            # выводим только основные столбцы в удобном виде
+            cols = [c for c in ["TA_ID", "TA_Name", "PH_Min", "PH_Max", "T_Max", "ST"] if c in df.columns]
+            st.dataframe(df[cols], use_container_width=True)
+        else:
+            st.info("Нет записей аналитов для отображения.")
+
+        # Пагинация
+        st.divider()
+        col_prev, col_page, col_next = st.columns([1, 1, 1])
+        with col_prev:
+            if st.button("◀ Предыдущая", key="analytes_prev", disabled=(current_page == 0)):
+                st.session_state['current_page'] = max(0, current_page - 1)
+                st.rerun()
+        with col_page:
+            st.markdown(f"**Страница {current_page + 1}**")
+        with col_next:
+            if st.button("Следующая ▶", key="analytes_next", disabled=(len(analytes) < page_size)):
+                st.session_state['current_page'] = current_page + 1
+                st.rerun()
+
+    '''def show_bio_layers(self):
         """Отображение биораспознающих слоев с пагинацией."""
         self.current_data_type = 'bio_layers'
         self.current_page = 0  # Сброс на первую страницу
@@ -1294,8 +2310,42 @@ class BiosensorGUI:
                 layer.get('SN', '')
             ))
         self.update_pagination_buttons()
+        '''
+    
+    # streamlit
+    def show_bio_layers(self):
+        """Streamlit-версия: отображение биораспознающих слоев с пагинацией."""
+        st.session_state['current_data_type'] = 'bio_layers'
+        st.session_state.setdefault('current_page', 0)
+        page_size = st.session_state.get('page_size', self.page_size)
+        current_page = st.session_state.get('current_page', 0)
+        offset = current_page * page_size
 
-    def show_immobilization_layers(self):
+        bio_layers = self.db_manager.list_all_bio_recognition_layers_paginated(page_size, offset)
+
+        st.subheader("🔴 Биораспознающие слои")
+        if bio_layers:
+            import pandas as pd
+            df = pd.DataFrame(bio_layers)
+            cols = [c for c in ["BRE_ID", "BRE_Name", "PH_Min", "PH_Max", "T_Min", "T_Max", "SN"] if c in df.columns]
+            st.dataframe(df[cols], use_container_width=True)
+        else:
+            st.info("Нет записей биораспознающих слоев для отображения.")
+
+        st.divider()
+        col_prev, col_page, col_next = st.columns([1, 1, 1])
+        with col_prev:
+            if st.button("◀ Предыдущая", key="bio_prev", disabled=(current_page == 0)):
+                st.session_state['current_page'] = max(0, current_page - 1)
+                st.rerun()
+        with col_page:
+            st.markdown(f"**Страница {current_page + 1}**")
+        with col_next:
+            if st.button("Следующая ▶", key="bio_next", disabled=(len(bio_layers) < page_size)):
+                st.session_state['current_page'] = current_page + 1
+                st.rerun()
+
+    '''def show_immobilization_layers(self):
         """Отображение иммобилизационных слоев с пагинацией."""
         self.current_data_type = 'immobilization_layers'
         self.current_page = 0  # Сброс на первую страницу
@@ -1318,8 +2368,42 @@ class BiosensorGUI:
                 layer.get('MP', '')
             ))
         self.update_pagination_buttons()
+        '''
+    
+    # streamlit
+    def show_immobilization_layers(self):
+        """Streamlit-версия: отображение иммобилизационных слоев с пагинацией."""
+        st.session_state['current_data_type'] = 'immobilization_layers'
+        st.session_state.setdefault('current_page', 0)
+        page_size = st.session_state.get('page_size', self.page_size)
+        current_page = st.session_state.get('current_page', 0)
+        offset = current_page * page_size
 
-    def show_memristive_layers(self):
+        im_layers = self.db_manager.list_all_immobilization_layers_paginated(page_size, offset)
+
+        st.subheader("🟡 Иммобилизационные слои")
+        if im_layers:
+            import pandas as pd
+            df = pd.DataFrame(im_layers)
+            cols = [c for c in ["IM_ID", "IM_Name", "PH_Min", "PH_Max", "T_Min", "T_Max", "MP"] if c in df.columns]
+            st.dataframe(df[cols], use_container_width=True)
+        else:
+            st.info("Нет записей иммобилизационных слоев для отображения.")
+
+        st.divider()
+        col_prev, col_page, col_next = st.columns([1, 1, 1])
+        with col_prev:
+            if st.button("◀ Предыдущая", key="immob_prev", disabled=(current_page == 0)):
+                st.session_state['current_page'] = max(0, current_page - 1)
+                st.rerun()
+        with col_page:
+            st.markdown(f"**Страница {current_page + 1}**")
+        with col_next:
+            if st.button("Следующая ▶", key="immob_next", disabled=(len(im_layers) < page_size)):
+                st.session_state['current_page'] = current_page + 1
+                st.rerun()
+
+    '''def show_memristive_layers(self):
         """Отображение мемристивных слоев с пагинацией."""
         self.current_data_type = 'memristive_layers'
         self.current_page = 0  # Сброс на первую страницу
@@ -1342,6 +2426,41 @@ class BiosensorGUI:
                 layer.get('SN', '')
             ))
         self.update_pagination_buttons()
+    '''
+
+    # streamlit
+    def show_memristive_layers(self):
+        """Streamlit-версия: отображение мемристивных слоев с пагинацией."""
+        st.session_state['current_data_type'] = 'memristive_layers'
+        st.session_state.setdefault('current_page', 0)
+        page_size = st.session_state.get('page_size', self.page_size)
+        current_page = st.session_state.get('current_page', 0)
+        offset = current_page * page_size
+
+        mem_layers = self.db_manager.list_all_memristive_layers_paginated(page_size, offset)
+
+        st.subheader("🟣 Мемристивные слои")
+        if mem_layers:
+            import pandas as pd
+            df = pd.DataFrame(mem_layers)
+            cols = [c for c in ["MEM_ID", "MEM_Name", "PH_Min", "PH_Max", "T_Min", "T_Max", "SN"] if c in df.columns]
+            st.dataframe(df[cols], use_container_width=True)
+        else:
+            st.info("Нет записей мемристивных слоёв для отображения.")
+
+        st.divider()
+        col_prev, col_page, col_next = st.columns([1, 1, 1])
+        with col_prev:
+            if st.button("◀ Предыдущая", key="mem_prev", disabled=(current_page == 0)):
+                st.session_state['current_page'] = max(0, current_page - 1)
+                st.rerun()
+        with col_page:
+            st.markdown(f"**Страница {current_page + 1}**")
+        with col_next:
+            if st.button("Следующая ▶", key="mem_next", disabled=(len(mem_layers) < page_size)):
+                st.session_state['current_page'] = current_page + 1
+                st.rerun()
+    
     
     """    
     def show_sensor_combination(self):
@@ -1368,7 +2487,7 @@ class BiosensorGUI:
         self.update_pagination_buttons()
     """
 
-    def refresh_data(self):
+    '''def refresh_data(self):
         """Обновление данных в зависимости от текущего типа."""
         if self.current_data_type == 'analytes':
             self.show_analytes()
@@ -1378,8 +2497,28 @@ class BiosensorGUI:
             self.show_immobilization_layers()
         elif self.current_data_type == 'memristive_layers':
             self.show_memristive_layers()
+    '''
 
-    def update_pagination_buttons(self):
+    # streamlit version
+    def refresh_data(self):
+        """Обновление данных в зависимости от текущего типа (Streamlit)."""
+        current = st.session_state.get('current_data_type', getattr(self, 'current_data_type', 'analytes'))
+        # гарантируем наличие номера страницы
+        st.session_state.setdefault('current_page', 0)
+
+        if current == 'analytes':
+            self.show_analytes()
+        elif current == 'bio_layers':
+            self.show_bio_layers()
+        elif current == 'immobilization_layers':
+            self.show_immobilization_layers()
+        elif current == 'memristive_layers':
+            self.show_memristive_layers()
+        else:
+            st.info("Тип данных не выбран или неизвестен")
+
+
+    '''def update_pagination_buttons(self):
         """Обновление кнопок пагинации."""
         if hasattr(self, 'pagination_frame'):
             self.pagination_frame.destroy()
@@ -1394,17 +2533,70 @@ class BiosensorGUI:
         page_label.pack(side='left', padx=10)
         
         tk.Button(self.pagination_frame, text="Следующая ▶", command=self.next_page).pack(side='left', padx=5)
+    '''
 
-    def prev_page(self):
+    # streamlit version
+    def update_pagination_buttons(self):
+        """Streamlit: отрисовать кнопки пагинации и номер страницы."""
+        page = st.session_state.get('current_page', 0)
+        page_size = st.session_state.get('page_size', self.page_size)
+        data_type = st.session_state.get('current_data_type', 'analytes')
+
+        # Определяем функцию получения данных для текущего типа
+        table_map = {
+            'analytes': self.db_manager.list_all_analytes_paginated,
+            'bio_layers': self.db_manager.list_all_bio_recognition_layers_paginated,
+            'immobilization_layers': self.db_manager.list_all_immobilization_layers_paginated,
+            'memristive_layers': self.db_manager.list_all_memristive_layers_paginated,
+            'sensor_combinations': self.db_manager.list_all_sensor_combinations_paginated
+        }
+        fetch_fn = table_map.get(data_type)
+        # Проверяем наличие следующей страницы (запрашиваем текущую страницу данных)
+        if fetch_fn:
+            rows = fetch_fn(page_size, page * page_size)
+        else:
+            rows = []
+
+        disabled_prev = (page == 0)
+        disabled_next = (len(rows) < page_size)
+
+        col_prev, col_label, col_next = st.columns([1, 1, 1])
+        with col_prev:
+            if st.button("◀ Предыдущая", key=f"prev_{data_type}", disabled=disabled_prev, use_container_width=True):
+                st.session_state['current_page'] = max(0, page - 1)
+                st.rerun()
+        with col_label:
+            st.markdown(f"**Страница {page + 1}**")
+        with col_next:
+            if st.button("Следующая ▶", key=f"next_{data_type}", disabled=disabled_next, use_container_width=True):
+                st.session_state['current_page'] = page + 1
+                st.rerun()
+
+    '''def prev_page(self):
         """Переход на предыдущую страницу."""
         if self.current_page > 0:
             self.current_page -= 1
-            self.refresh_data()
-
-    def next_page(self):
+            self.refresh_data()'''
+    
+    # streamlit version
+    def prev_page(self):
+        """Streamlit: переход на предыдущую страницу."""
+        page = st.session_state.get('current_page', 0)
+        if page > 0:
+            st.session_state['current_page'] = page - 1
+            st.rerun()
+            
+    '''def next_page(self):
         """Переход на следующую страницу."""
         self.current_page += 1
-        self.refresh_data()
+        self.refresh_data()'''
+
+    # streamlit version
+    def next_page(self):
+        """Streamlit: переход на следующую страницу."""
+        page = st.session_state.get('current_page', 0)
+        st.session_state['current_page'] = page + 1
+        st.rerun()
         
     def computing_combinations(self):
         """рассчет и сохранение комбинаций сенсоров"""
@@ -1414,7 +2606,7 @@ class BiosensorGUI:
         mem_layers = self.db_manager.list_all_memristive_layers()
         
         
-
+    ''' 
     def show_best_combinations(self):
         """Отображение комбинаций сенсоров с пагинацией."""
         self.current_data_type = 'sensor_combinations'
@@ -1443,14 +2635,85 @@ class BiosensorGUI:
                 layer.get('Score', '')
             ))
         """self.analysis_text.insert(tk.END, "Функция в разработке...\n")"""
+    '''
+
+    # streamlit version
+    def show_best_combinations(self):
+        """Отображение лучших комбинаций сенсоров."""
+        st.session_state.analysis_result = "=== ЛУЧШИЕ КОМБИНАЦИИ БИОСЕНСОРОВ ===\n\n"
         
-    def comparative_analysis(self):
+        # Получение всех комбинаций
+        sensor_combinations = self.db_manager.list_all_sensor_combinations()
+        
+        if sensor_combinations:
+            for combo in sensor_combinations:
+                combo_info = f"""
+                    Комбинация: {combo.get('Combo_ID', 'N/A')}
+                    ├─ Аналит: {combo.get('TA_ID', 'N/A')}
+                    ├─ Биослой: {combo.get('BRE_ID', 'N/A')}
+                    ├─ Иммобилизация: {combo.get('IM_ID', 'N/A')}
+                    ├─ Мемристивный слой: {combo.get('MEM_ID', 'N/A')}
+                    └─ Оценка: {combo.get('Score', 'N/A')}
+                    """
+                st.session_state.analysis_result += combo_info + "\n"
+            st.success("✅ Анализ завершен!")
+        else:
+            st.session_state.analysis_result += "Нет комбинаций в базе данных."
+            st.info("ℹ️ Сначала создайте комбинации сенсоров.")
+
+
+    '''def comparative_analysis(self):
         """Выполнение сравнительного анализа."""
         self.analysis_text.delete(1.0, tk.END)
         self.analysis_text.insert(tk.END, "=== СРАВНИТЕЛЬНЫЙ АНАЛИЗ ===\n\n")
         self.analysis_text.insert(tk.END, "Функция в разработке...\n")
+    '''
 
-    def show_statistics(self):
+    # streamlit version
+    def comparative_analysis(self):
+        """Выполнение сравнительного анализа."""
+        st.session_state.analysis_result = "=== СРАВНИТЕЛЬНЫЙ АНАЛИЗ ===\n\n"
+        
+        try:
+            # Подсчет записей в каждой таблице
+            analytes = self.db_manager.list_all_analytes()
+            bio_layers = self.db_manager.list_all_bio_recognition_layers()
+            im_layers = self.db_manager.list_all_immobilization_layers()
+            mem_layers = self.db_manager.list_all_memristive_layers()
+            
+            analysis_text = f"""
+                Сравнение составных частей биосенсоров:
+
+                📋 АНАЛИТЫ: {len(analytes)} записей
+                {'-' * 40}
+                """
+            for analyte in analytes[:3]:  # Показываем первые 3
+                analysis_text += f"  • {analyte.get('TA_Name', 'N/A')} (pH: {analyte.get('PH_Min')}-{analyte.get('PH_Max')})\n"
+            
+            analysis_text += f"\n🔴 БИОРАСПОЗНАЮЩИЕ СЛОИ: {len(bio_layers)} записей\n"
+            analysis_text += f"{'-' * 40}\n"
+            for bio in bio_layers[:3]:  # Показываем первые 3
+                analysis_text += f"  • {bio.get('BRE_Name', 'N/A')} (Чувствительность: {bio.get('SN')})\n"
+            
+            analysis_text += f"\n🟡 ИММОБИЛИЗАЦИОННЫЕ СЛОИ: {len(im_layers)} записей\n"
+            analysis_text += f"{'-' * 40}\n"
+            for im in im_layers[:3]:  # Показываем первые 3
+                analysis_text += f"  • {im.get('IM_Name', 'N/A')} (Модуль: {im.get('MP')})\n"
+            
+            analysis_text += f"\n🟣 МЕМРИСТИВНЫЕ СЛОИ: {len(mem_layers)} записей\n"
+            analysis_text += f"{'-' * 40}\n"
+            for mem in mem_layers[:3]:  # Показываем первые 3
+                analysis_text += f"  • {mem.get('MEM_Name', 'N/A')} (Чувствительность: {mem.get('SN')})\n"
+            
+            st.session_state.analysis_result = analysis_text
+            st.success("✅ Сравнительный анализ завершен!")
+        
+        except Exception as e:
+            st.session_state.analysis_result = f"Ошибка при выполнении анализа: {str(e)}"
+            st.error("❌ Ошибка при выполнении анализа")
+
+
+    '''def show_statistics(self):
         """Отображение статистики базы данных."""
         self.analysis_text.delete(1.0, tk.END)
         self.analysis_text.insert(tk.END, "=== СТАТИСТИКА БАЗЫ ДАННЫХ ===\n\n")
@@ -1474,19 +2737,156 @@ class BiosensorGUI:
             self.analysis_text.insert(tk.END, stats)
         except Exception as e:
             self.analysis_text.insert(tk.END, f"Ошибка получения статистики: {str(e)}")
+    '''
 
-    def export_data(self):
+    # streamlit version
+    def show_statistics(self):
+        """Отображение статистики базы данных."""
+        try:
+            cursor = self.db_manager.conn.cursor()
+            
+            cursor.execute("SELECT COUNT(*) FROM Analytes")
+            analytes_count = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM BioRecognitionLayers")
+            bio_count = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM ImmobilizationLayers")
+            immob_count = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM MemristiveLayers")
+            mem_count = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM SensorCombinations")
+            combo_count = cursor.fetchone()[0]
+            
+            stats = f"""=== СТАТИСТИКА БАЗЫ ДАННЫХ ===
+
+                Количество записей по типам:
+
+                📋 Аналиты: {analytes_count}
+                🔴 Биораспознающие слои: {bio_count}
+                🟡 Иммобилизационные слои: {immob_count}
+                🟣 Мемристивные слои: {mem_count}
+                ⚙️  Комбинации сенсоров: {combo_count}
+
+                ВСЕГО ЭЛЕМЕНТОВ: {analytes_count + bio_count + immob_count + mem_count + combo_count}
+                """
+            st.session_state.analysis_result = stats
+            st.success("✅ Статистика обновлена!")
+            
+        except Exception as e:
+            st.session_state.analysis_result = f"Ошибка получения статистики: {str(e)}"
+            st.error("❌ Ошибка при получении статистики")
+
+
+    '''def export_data(self):
         """Экспорт данных в файл."""
-        messagebox.showinfo("Экспорт", "Функция в разработке")
+        messagebox.showinfo("Экспорт", "Функция в разработке")'''
+    
+    # streamlit version
+    def export_data(self):
+        """Экспорт данных в файл (Streamlit)."""
+        st.subheader("📤 Экспорт данных")
+        choices = {
+            "Аналиты": "analytes",
+            "Биослои (BRE)": "bio_recognition",
+            "Иммобилизационные слои (IM)": "immobilization",
+            "Мемристивные слои (MEM)": "memristive",
+            "Комбинации сенсоров": "sensor_combinations",
+            "Всё": "all"
+        }
+        choice_label = st.selectbox("Что экспортировать", list(choices.keys()))
+        choice = choices[choice_label]
+        fmt = st.radio("Формат экспорта", ["csv", "json"], horizontal=True)
 
-    def about(self):
+        if st.button("Экспортировать"):
+            try:
+                import pandas as pd
+                import io
+                import zipfile
+                from datetime import datetime
+
+                def fetch_table(key):
+                    if key == "analytes":
+                        return self.db_manager.list_all_analytes()
+                    if key == "bio_recognition":
+                        return self.db_manager.list_all_bio_recognition_layers()
+                    if key == "immobilization":
+                        return self.db_manager.list_all_immobilization_layers()
+                    if key == "memristive":
+                        return self.db_manager.list_all_memristive_layers()
+                    if key == "sensor_combinations":
+                        return self.db_manager.list_all_sensor_combinations()
+                    return {}
+
+                ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+
+                if choice == "all":
+                    tables = {
+                        "analytes": fetch_table("analytes"),
+                        "bio_recognition": fetch_table("bio_recognition"),
+                        "immobilization": fetch_table("immobilization"),
+                        "memristive": fetch_table("memristive"),
+                        "sensor_combinations": fetch_table("sensor_combinations"),
+                    }
+                    if fmt == "json":
+                        payload = json.dumps(tables, ensure_ascii=False, indent=2).encode("utf-8")
+                        filename = f"all_data_{ts}.json"
+                        st.download_button("Скачать JSON", data=payload, file_name=filename, mime="application/json")
+                    else:
+                        buf = io.BytesIO()
+                        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                            for name, rows in tables.items():
+                                df = pd.DataFrame(rows)
+                                zf.writestr(f"{name}.csv", df.to_csv(index=False).encode("utf-8-sig"))
+                        buf.seek(0)
+                        st.download_button("Скачать ZIP с CSV", data=buf, file_name=f"all_data_{ts}.zip", mime="application/zip")
+                else:
+                    rows = fetch_table(choice)
+                    if fmt == "json":
+                        payload = json.dumps(rows, ensure_ascii=False, indent=2).encode("utf-8")
+                        filename = f"{choice}_{ts}.json"
+                        st.download_button("Скачать JSON", data=payload, file_name=filename, mime="application/json")
+                    else:
+                        df = pd.DataFrame(rows)
+                        csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+                        filename = f"{choice}_{ts}.csv"
+                        st.download_button("Скачать CSV", data=csv_bytes, file_name=filename, mime="text/csv")
+
+                st.success("✅ Экспорт выполнен")
+            except Exception as e:
+                self.logger.exception("Ошибка экспорта данных")
+                st.error(f"Ошибка экспорта: {e}")
+
+    '''def about(self):
         """Отображение информации о программе."""
         messagebox.showinfo("О программе", "Паспорта мемристивных биосенсоров v2.0\n\n© 2025")
+    '''
 
-    def run(self):
+    # streamlit version
+    def about(self):
+        """Отображение информации о программе (Streamlit)."""
+        info = "Паспорта мемристивных биосенсоров v2.0\n\n© 2025"
+        st.info(info)
+        try:
+            self.logger.info("Показана информация 'О программе'")
+        except Exception:
+            pass
+
+    '''def run(self):
         """Запуск приложения."""
         self.root.mainloop()
         self.db_manager.close()
+    '''
+
+    # streamlit version
+    def run(self):
+        """Запуск приложения (Streamlit). Регистрируем закрытие БД при завершении процесса."""
+        # В Streamlit нет mainloop(); интерфейс рендерится при импорте/вызове методов.
+        # Регистрируем корректное закрытие соединения при завершении процесса.
+        atexit.register(self.db_manager.close)
+        return None
 
 if __name__ == "__main__":
     app = BiosensorGUI()
