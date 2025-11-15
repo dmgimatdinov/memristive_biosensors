@@ -158,8 +158,9 @@ class DatabaseManager:
             self.logger.error(f"Ошибка вставки аналита: {e}")
             return False'''
 
+    
     # Streamlit-версия функции вставки аналита с проверкой дубликатов
-    def insert_analyte(self, data: Dict[str, Any]) -> bool:
+    '''def insert_analyte(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена аналита с проверкой дубликатов (Streamlit-версия)."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT TA_ID FROM Analytes WHERE TA_ID = ?", (data['TA_ID'],))
@@ -197,6 +198,34 @@ class DatabaseManager:
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки аналита: {e}")
             st.error(f"❌ Ошибка вставки аналита: {e}")
+            return False'''
+    
+    """Управление БД - БЕЗ Streamlit вызовов"""
+    def insert_analyte(self, data: Dict[str, Any]) -> bool:
+        """Вставка или замена аналита."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT TA_ID FROM Analytes WHERE TA_ID = ?", (data['TA_ID'],))
+        
+        if cursor.fetchone():
+            # ВАЖНО: Возвращаем специальный код вместо показа диалога
+            return "DUPLICATE"  # Сигнал о дубликате
+        
+        query = """
+        INSERT OR REPLACE INTO Analytes (TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, HL, PC)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor.execute(query, (
+                data['TA_ID'], data['TA_Name'], data.get('PH_Min'),
+                data.get('PH_Max'), data.get('T_Max'), data.get('ST'),
+                data.get('HL'), data.get('PC')
+            ))
+            self.conn.commit()
+            self.clear_cache()
+            self.logger.info(f"Аналит {data['TA_ID']} успешно вставлен")
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка вставки аналита: {e}")
             return False
 
     '''def insert_bio_recognition_layer(self, data: Dict[str, Any]) -> bool:
@@ -317,29 +346,29 @@ class DatabaseManager:
                 if not st.session_state.get(f'confirm_overwrite_immob_{data["IM_ID"]}', False):
                     return False
             
-            query = """
-            INSERT OR REPLACE INTO ImmobilizationLayers 
-            (IM_ID, IM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, Adh, Sol, K_IM, RP, TR, ST, HL, PC)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """
-            try:
-                cursor.execute(query, (
-                    data['IM_ID'], data['IM_Name'], data.get('PH_Min'), data.get('PH_Max'),
-                    data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('Adh'),
-                    data.get('Sol'), data.get('K_IM'), data.get('RP'), data.get('TR'),
-                    data.get('ST'), data.get('HL'), data.get('PC')
-                ))
-                self.conn.commit()
-                self.clear_cache()
-                self.logger.info(f"Иммобилизационный слой {data['IM_ID']} успешно вставлен")
-                st.success(f"✅ Иммобилизационный слой {data['IM_ID']} успешно сохранён")
-                return True
-            except sqlite3.Error as e:
-                self.logger.error(f"Ошибка вставки иммобилизационного слоя: {e}")
-                st.error(f"❌ Ошибка вставки иммобилизационного слоя: {e}")
-                return False
+        query = """
+        INSERT OR REPLACE INTO ImmobilizationLayers 
+        (IM_ID, IM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, Adh, Sol, K_IM, RP, TR, ST, HL, PC)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor.execute(query, (
+                data['IM_ID'], data['IM_Name'], data.get('PH_Min'), data.get('PH_Max'),
+                data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('Adh'),
+                data.get('Sol'), data.get('K_IM'), data.get('RP'), data.get('TR'),
+                data.get('ST'), data.get('HL'), data.get('PC')
+            ))
+            self.conn.commit()
+            self.clear_cache()
+            self.logger.info(f"Иммобилизационный слой {data['IM_ID']} успешно вставлен")
+            st.success(f"✅ Иммобилизационный слой {data['IM_ID']} успешно сохранён")
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка вставки иммобилизационного слоя: {e}")
+            st.error(f"❌ Ошибка вставки иммобилизационного слоя: {e}")
+            return False
     
-    def insert_memristive_layer(self, data: Dict[str, Any]) -> bool:
+    '''def insert_memristive_layer(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена мемристивного слоя с проверкой дубликатов."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT MEM_ID FROM MemristiveLayers WHERE MEM_ID = ?", (data['MEM_ID'],))
@@ -364,9 +393,52 @@ class DatabaseManager:
             return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки мемристивного слоя: {e}")
+            return False'''
+
+    # Streamlit-версия функции вставки мемристивного слоя с проверкой дубликатов
+    def insert_memristive_layer(self, data: Dict[str, Any]) -> bool:
+        """Вставка или замена мемристивного слоя с проверкой дубликатов (Streamlit-версия)."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT MEM_ID FROM MemristiveLayers WHERE MEM_ID = ?", (data['MEM_ID'],))
+        
+        if cursor.fetchone():
+            # В Streamlit используем st.warning + логику в callback вместо messagebox
+            st.warning(f"⚠️ Мемристивный слой {data['MEM_ID']} уже существует")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Перезаписать", key=f"overwrite_mem_{data['MEM_ID']}"):
+                    st.session_state[f'confirm_overwrite_mem_{data["MEM_ID"]}'] = True
+            with col2:
+                if st.button("❌ Отмена", key=f"cancel_mem_{data['MEM_ID']}"):
+                    return False
+            
+            # Проверяем подтверждение
+            if not st.session_state.get(f'confirm_overwrite_mem_{data["MEM_ID"]}', False):
+                return False
+        
+        query = """
+        INSERT OR REPLACE INTO MemristiveLayers 
+        (MEM_ID, MEM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, SN, DR_Min, DR_Max, RP, TR, ST, LOD, HL, PC)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor.execute(query, (
+                data['MEM_ID'], data['MEM_Name'], data.get('PH_Min'), data.get('PH_Max'),
+                data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('SN'),
+                data.get('DR_Min'), data.get('DR_Max'), data.get('RP'), data.get('TR'),
+                data.get('ST'), data.get('LOD'), data.get('HL'), data.get('PC')
+            ))
+            self.conn.commit()
+            self.clear_cache()
+            self.logger.info(f"Мемристивный слой {data['MEM_ID']} успешно вставлен")
+            st.success(f"✅ Мемристивный слой {data['MEM_ID']} успешно сохранён")
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка вставки мемристивного слоя: {e}")
+            st.error(f"❌ Ошибка вставки мемристивного слоя: {e}")
             return False
         
-    def insert_sensor_combination(self, data: Dict[str, Any]) -> bool:
+    '''def insert_sensor_combination(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена комбинации сенсора с проверкой дубликатов."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT Combo_ID FROM SensorCombinations WHERE Combo_ID = ?", (data['Combo_ID'],))
@@ -391,6 +463,49 @@ class DatabaseManager:
             return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки комбинации сенсора: {e}")
+            return False'''
+
+    # Streamlit-версия функции вставки комбинации сенсора с проверкой дубликатов
+    def insert_sensor_combination(self, data: Dict[str, Any]) -> bool:
+        """Вставка или замена комбинации сенсора с проверкой дубликатов (Streamlit-версия)."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT Combo_ID FROM SensorCombinations WHERE Combo_ID = ?", (data['Combo_ID'],))
+        
+        if cursor.fetchone():
+            # В Streamlit используем st.warning + логику в callback вместо messagebox
+            st.warning(f"⚠️ Комбинация {data['Combo_ID']} уже существует")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Перезаписать", key=f"overwrite_combo_{data['Combo_ID']}"):
+                    st.session_state[f'confirm_overwrite_combo_{data["Combo_ID"]}'] = True
+            with col2:
+                if st.button("❌ Отмена", key=f"cancel_combo_{data['Combo_ID']}"):
+                    return False
+            
+            # Проверяем подтверждение
+            if not st.session_state.get(f'confirm_overwrite_combo_{data["Combo_ID"]}', False):
+                return False
+        
+        query = """
+        INSERT OR REPLACE INTO SensorCombinations 
+        (Combo_ID, TA_ID, BRE_ID, IM_ID, MEM_ID, SN_total, TR_total, ST_total, RP_total, LOD_total, DR_total, HL_total, PC_total, Score, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor.execute(query, (
+                data['Combo_ID'], data.get('TA_ID'), data.get('BRE_ID'), data.get('IM_ID'),
+                data.get('MEM_ID'), data.get('SN_total'), data.get('TR_total'), data.get('ST_total'),
+                data.get('RP_total'), data.get('LOD_total'), data.get('DR_total'), data.get('HL_total'),
+                data.get('PC_total'), data.get('Score'), data.get('created_at')
+            ))
+            self.conn.commit()
+            self.clear_cache()
+            self.logger.info(f"Комбинация сенсора {data['Combo_ID']} успешно вставлена")
+            st.success(f"✅ Комбинация сенсора {data['Combo_ID']} успешно сохранена")
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка вставки комбинации сенсора: {e}")
+            st.error(f"❌ Ошибка вставки комбинации сенсора: {e}")
             return False
 
     @lru_cache(maxsize=32)
@@ -677,7 +792,7 @@ class DatabaseManager:
         self.conn.close()
         self.logger.info("Соединение с базой данных закрыто")
 
-class Section:
+'''class Section:
     """Базовый класс для секций ввода в GUI."""
     def __init__(self, parent, title: str, color: str, fields: List[Dict]):
         self.frame = tk.LabelFrame(parent, text=title, font=('Arial', 12, 'bold'), fg=color, padx=10, pady=10)
@@ -802,6 +917,7 @@ class MemristiveSection(Section):
     """Секция для ввода данных мемристивного слоя."""
     def __init__(self, parent, fields):
         super().__init__(parent, "🟣 Мемристивный слой (MEM)", '#9c27b0', fields)
+'''
 
 class BiosensorGUI:
     """GUI-приложение для управления паспортами мемристивных биосенсоров."""
@@ -1839,10 +1955,37 @@ class BiosensorGUI:
                 'PC': st.session_state.get('analyte_power_consumption')
             }
             
-            if analyte_data['TA_ID']:
+            
+            '''if analyte_data['TA_ID']:
                 if self.db_manager.insert_analyte(analyte_data):
                     st.success("✅ Аналит сохранён")
                     self.logger.info(f"Аналит {analyte_data['TA_ID']} сохранён")
+            '''
+            if not analyte_data['TA_ID']:
+                st.error("❌ ID аналита не может быть пустым")
+                return
+            
+            result = self.db_manager.insert_analyte(analyte_data)
+            
+            # Обработка результата в GUI слое
+            if result == "DUPLICATE":
+                st.warning(f"⚠️ Аналит {analyte_data['TA_ID']} уже существует")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ Перезаписать", key=f"overwrite_analyte_{analyte_data['TA_ID']}"):
+                        # Удалить существующий и вставить новый
+                        cursor = self.db_manager.conn.cursor()
+                        cursor.execute("DELETE FROM Analytes WHERE TA_ID = ?", (analyte_data['TA_ID'],))
+                        self.db_manager.conn.commit()
+                        self.db_manager.insert_analyte(analyte_data)
+                        st.success("✅ Аналит перезаписан!")
+                with col2:
+                    if st.button("❌ Отмена", key=f"cancel_analyte_{analyte_data['TA_ID']}"):
+                        st.info("Операция отменена")
+            elif result is True:
+                st.success(f"✅ Аналит {analyte_data['TA_ID']} успешно сохранён")
+            else:
+                st.error(f"❌ Ошибка сохранения аналита")
             
             # Сохранение биораспознающего слоя
             bio_data = {
