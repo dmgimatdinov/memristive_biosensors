@@ -256,7 +256,7 @@ class DatabaseManager:
             return False'''
 
     # Streamlit-версия функции вставки биораспознающего слоя с проверкой дубликатов
-    def insert_bio_recognition_layer(self, data: Dict[str, Any]) -> bool:
+    '''def insert_bio_recognition_layer(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена биораспознающего слоя с проверкой дубликатов (Streamlit-версия)."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT BRE_ID FROM BioRecognitionLayers WHERE BRE_ID = ?", (data['BRE_ID'],))
@@ -296,6 +296,35 @@ class DatabaseManager:
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки биослоя: {e}")
             st.error(f"❌ Ошибка вставки биослоя: {e}")
+            return False'''
+    
+    """Управление БД - БЕЗ Streamlit вызовов"""
+    def insert_bio_recognition_layer(self, data: Dict[str, Any]) -> bool:
+        """Вставка или замена биораспознающего слоя (без Streamlit UI)."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT BRE_ID FROM BioRecognitionLayers WHERE BRE_ID = ?", (data['BRE_ID'],))
+        if cursor.fetchone():
+            # Сигнализируем вызывающему коду, что запись уже существует
+            return "DUPLICATE"
+
+        query = """
+        INSERT OR REPLACE INTO BioRecognitionLayers 
+        (BRE_ID, BRE_Name, PH_Min, PH_Max, T_Min, T_Max, SN, DR_Min, DR_Max, RP, TR, ST, LOD, HL, PC)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor.execute(query, (
+                data['BRE_ID'], data['BRE_Name'], data.get('PH_Min'), data.get('PH_Max'),
+                data.get('T_Min'), data.get('T_Max'), data.get('SN'), data.get('DR_Min'),
+                data.get('DR_Max'), data.get('RP'), data.get('TR'), data.get('ST'),
+                data.get('LOD'), data.get('HL'), data.get('PC')
+            ))
+            self.conn.commit()
+            self.clear_cache()
+            self.logger.info(f"Биослой {data['BRE_ID']} успешно вставлен")
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка вставки биослоя: {e}")
             return False
 
     '''def insert_immobilization_layer(self, data: Dict[str, Any]) -> bool:
@@ -2006,11 +2035,50 @@ class BiosensorGUI:
                 'PC': st.session_state.get('bio_power_consumption')
             }
             
-            if bio_data['BRE_ID']:
+            '''if bio_data['BRE_ID']:
                 if self.db_manager.insert_bio_recognition_layer(bio_data):
                     st.success("✅ Биораспознающий слой сохранён")
                     self.logger.info(f"Биослой {bio_data['BRE_ID']} сохранён")
-            
+            '''
+
+
+            if not bio_data["BRE_ID"]:
+                st.error("❌ Введите BRE_ID")
+                return
+
+            result = self.db_manager.insert_bio_recognition_layer(bio_data)
+
+             # Обработка результата в GUI слое
+            if result == "DUPLICATE":
+                st.warning(f"⚠️ Биослой {bio_data['BRE_ID']} уже существует")
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    if st.button("✅ Перезаписать", key=f"overwrite_bio_ui_{bio_data['BRE_ID']}"):
+                        try:
+                            # Удаляем существующую запись и пробуем вставить снова
+                            cur = self.db_manager.conn.cursor()
+                            cur.execute("DELETE FROM BioRecognitionLayers WHERE BRE_ID = ?", (bio_data['BRE_ID'],))
+                            self.db_manager.conn.commit()
+                            inserted = self.db_manager.insert_bio_recognition_layer(bio_data)
+                            if inserted is True:
+                                st.success("✅ Биослой перезаписан")
+                            else:
+                                st.error("❌ Ошибка при перезаписи биослоя")
+                            st.rerun()
+                        except Exception as e:
+                            self.logger.exception("Ошибка перезаписи биослоя")
+                            st.error(f"❌ Ошибка: {e}")
+                with col2:
+                    if st.button("❌ Отмена", key=f"cancel_bio_ui_{bio_data['BRE_ID']}"):
+                        st.info("Операция отменена")
+                return
+
+            if result is True:
+                st.success("✅ Биослой сохранён")
+                st.rerun()
+            else:
+                st.error("❌ Не удалось сохранить биослой")
+                
             # Сохранение иммобилизационного слоя
             immob_data = {
                 'IM_ID': st.session_state.get('immob_im_id', ''),
