@@ -1053,6 +1053,16 @@ class BiosensorGUI:
         # Инициализация базы данных
         self.db_manager = DatabaseManager()
 
+        # ✅ Инициализируем session_state для управления UI
+        if 'active_section' not in st.session_state:
+            st.session_state.active_section = 'data_entry'  # 'data_entry', 'database', 'analysis', 'about'
+        
+        if 'page_size' not in st.session_state:
+            st.session_state.page_size = 50
+        
+        if 'current_page' not in st.session_state:
+            st.session_state.current_page = 0
+
         # Настройки пагинации
         self.page_size = 50
         self.current_page = 0
@@ -1221,30 +1231,48 @@ class BiosensorGUI:
         st.sidebar.subheader("📁 Файл")
         col1, col2 = st.sidebar.columns(2)
         with col1:
-            if st.button("💾 Сохранить паспорт", key="menu_save_passport"):
+            if st.button("💾 Сохранить паспорт", key="menu_save_passport", width="stretch"):
                 self.save_passport_to_db_streamlit()
         with col2:
-            if st.button("📂 Загрузить паспорт", key="menu_load_passport"):
+            if st.button("📂 Загрузить паспорт", key="menu_load_passport", width="stretch"):
                 self.load_passport_from_db_streamlit()
     
         st.sidebar.divider()
+
+            # Раздел "Навигация"
+        st.sidebar.subheader("🔀 Навигация")
+        nav_col1, nav_col2, nav_col3 = st.sidebar.columns(3)
+        
+        with nav_col1:
+            if st.button("🔬 Ввод", key="nav_data_entry", width="stretch"):
+                st.session_state.active_section = 'data_entry'
+                st.rerun()
+        with nav_col2:
+            if st.button("📊 База", key="nav_database", width="stretch"):
+                st.session_state.active_section = 'database'
+                st.rerun()
+        with nav_col3:
+            if st.button("📈 Анализ", key="nav_analysis", width="stretch"):
+                st.session_state.active_section = 'analysis'
+                st.rerun()
     
         # Раздел "Инструменты"
         st.sidebar.subheader("🔧 Инструменты")
         col3, col4 = st.sidebar.columns(2)
         with col3:
-            if st.button("🗑️ Очистить форму", key="menu_clear_form"):
+            if st.button("🗑️ Очистить", key="menu_clear_form", width="stretch"):
                 self.clear_form_streamlit()
         with col4:
-            if st.button("📊 Экспорт данных", key="menu_export_data"):
+            if st.button("📊 Экспорт", key="menu_export_data", width="stretch"):
                 self.export_data()
     
         st.sidebar.divider()
     
         # Раздел "Справка"
         st.sidebar.subheader("❓ Справка")
-        if st.button("ℹ️ О программе", key="menu_about"):
-            self.about()
+        if st.button("ℹ️ О программе", key="menu_about", width="stretch"):
+            st.session_state.active_section = 'about'
+            st.rerun()
 
     '''def create_notebook(self):
         """Создание вкладок интерфейса."""
@@ -3317,11 +3345,40 @@ class BiosensorGUI:
         # ✅ Регистрируем закрытие БД при завершении
         atexit.register(self.db_manager.close)
         
-        # ✅ Создаём меню
+        # ✅ Инициализируем session_state с помощью setdefault()
+        st.session_state.setdefault('active_section', 'data_entry')
+        
+        # ✅ Создаём меню в боковой панели
         self.create_menu()
         
+        st.divider()
+        
+        # ✅ Контролируем, что показывать на основе session_state
+        active = st.session_state.active_section
+        
+        if active == 'data_entry':
+            st.header("🔬 Ввод паспортов")
+            self.create_data_entry_tab()
+        
+        elif active == 'database':
+            st.header("📊 База данных")
+            self.create_database_tab()
+        
+        elif active == 'analysis':
+            st.header("📈 Анализ")
+            self.create_analysis_tab()
+        
+        elif active == 'about':
+            st.header("ℹ️ О программе")
+            self.about()
+        
+        else:
+            # По умолчанию показываем ввод паспортов
+            st.header("🔬 Ввод паспортов")
+            self.create_data_entry_tab()
+            
         # ✅ Создаём вкладки НАПРЯМУЮ (без рекурсии)
-        tabs = st.tabs([
+        '''tabs = st.tabs([
             "🔬 Ввод паспортов",
             "📊 База данных",
             "📈 Анализ"
@@ -3335,14 +3392,4 @@ class BiosensorGUI:
             self.create_database_tab()
         
         with tabs[2]:
-            self.create_analysis_tab()
-
-@st.cache_resource
-def initialize_app():
-    """Инициализирует приложение один раз и сохраняет в кэш."""
-    app = BiosensorGUI()
-    return app
-
-if __name__ == "__main__":
-    app = BiosensorGUI()
-    app.run()
+            self.create_analysis_tab()'''
