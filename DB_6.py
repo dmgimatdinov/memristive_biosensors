@@ -355,7 +355,7 @@ class DatabaseManager:
             return False'''
     
     # Streamlit-версия функции вставки иммобилизационного слоя с проверкой дубликатов
-    def insert_immobilization_layer(self, data: Dict[str, Any]) -> bool:
+    '''def insert_immobilization_layer(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена иммобилизационного слоя с проверкой дубликатов (Streamlit-версия)."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT IM_ID FROM ImmobilizationLayers WHERE IM_ID = ?", (data['IM_ID'],))
@@ -395,7 +395,37 @@ class DatabaseManager:
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки иммобилизационного слоя: {e}")
             st.error(f"❌ Ошибка вставки иммобилизационного слоя: {e}")
+            return False'''
+    
+    """Управление БД - БЕЗ Streamlit вызовов"""
+    def insert_immobilization_layer(self, data: Dict[str, Any]) -> bool:
+        """Вставка или замена иммобилизационного слоя (без Streamlit UI)."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT IM_ID FROM ImmobilizationLayers WHERE IM_ID = ?", (data['IM_ID'],))
+        if cursor.fetchone():
+            # Сигнализируем вызывающему коду, что запись уже существует
+            return "DUPLICATE"
+
+        query = """
+        INSERT OR REPLACE INTO ImmobilizationLayers 
+        (IM_ID, IM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, Adh, Sol, K_IM, RP, TR, ST, HL, PC)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor.execute(query, (
+                data['IM_ID'], data['IM_Name'], data.get('PH_Min'), data.get('PH_Max'),
+                data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('Adh'),
+                data.get('Sol'), data.get('K_IM'), data.get('RP'), data.get('TR'),
+                data.get('ST'), data.get('HL'), data.get('PC')
+            ))
+            self.conn.commit()
+            self.clear_cache()
+            self.logger.info(f"Иммобилизационный слой {data['IM_ID']} успешно вставлен")
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка вставки иммобилизационного слоя: {e}")
             return False
+        
     
     '''def insert_memristive_layer(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена мемристивного слоя с проверкой дубликатов."""
@@ -425,7 +455,7 @@ class DatabaseManager:
             return False'''
 
     # Streamlit-версия функции вставки мемристивного слоя с проверкой дубликатов
-    def insert_memristive_layer(self, data: Dict[str, Any]) -> bool:
+    '''def insert_memristive_layer(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена мемристивного слоя с проверкой дубликатов (Streamlit-версия)."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT MEM_ID FROM MemristiveLayers WHERE MEM_ID = ?", (data['MEM_ID'],))
@@ -465,7 +495,7 @@ class DatabaseManager:
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки мемристивного слоя: {e}")
             st.error(f"❌ Ошибка вставки мемристивного слоя: {e}")
-            return False
+            return False'''
         
     '''def insert_sensor_combination(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена комбинации сенсора с проверкой дубликатов."""
@@ -493,9 +523,39 @@ class DatabaseManager:
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки комбинации сенсора: {e}")
             return False'''
+    
+    # DatabaseManager class method - CLEAN (no Streamlit UI)
+
+    def insert_memristive_layer(self, data: Dict[str, Any]) -> bool:
+        """Вставка или замена мемристивного слоя (без Streamlit UI)."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT MEM_ID FROM MemristiveLayers WHERE MEM_ID = ?", (data['MEM_ID'],))
+        if cursor.fetchone():
+            # Сигнализируем вызывающему коду, что запись уже существует
+            return "DUPLICATE"
+
+        query = """
+        INSERT OR REPLACE INTO MemristiveLayers 
+        (MEM_ID, MEM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, SN, DR_Min, DR_Max, RP, TR, ST, LOD, HL, PC)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor.execute(query, (
+                data['MEM_ID'], data['MEM_Name'], data.get('PH_Min'), data.get('PH_Max'),
+                data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('SN'),
+                data.get('DR_Min'), data.get('DR_Max'), data.get('RP'), data.get('TR'),
+                data.get('ST'), data.get('LOD'), data.get('HL'), data.get('PC')
+            ))
+            self.conn.commit()
+            self.clear_cache()
+            self.logger.info(f"Мемристивный слой {data['MEM_ID']} успешно вставлен")
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка вставки мемристивного слоя: {e}")
+            return False
 
     # Streamlit-версия функции вставки комбинации сенсора с проверкой дубликатов
-    def insert_sensor_combination(self, data: Dict[str, Any]) -> bool:
+    '''def insert_sensor_combination(self, data: Dict[str, Any]) -> bool:
         """Вставка или замена комбинации сенсора с проверкой дубликатов (Streamlit-версия)."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT Combo_ID FROM SensorCombinations WHERE Combo_ID = ?", (data['Combo_ID'],))
@@ -535,6 +595,36 @@ class DatabaseManager:
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки комбинации сенсора: {e}")
             st.error(f"❌ Ошибка вставки комбинации сенсора: {e}")
+            return False'''
+
+# DatabaseManager class method - CLEAN (no Streamlit UI)
+
+    def insert_sensor_combination(self, data: Dict[str, Any]) -> bool:
+        """Вставка или замена комбинации сенсора (без Streamlit UI)."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT Combo_ID FROM SensorCombinations WHERE Combo_ID = ?", (data['Combo_ID'],))
+        if cursor.fetchone():
+            # Сигнализируем вызывающему коду, что запись уже существует
+            return "DUPLICATE"
+
+        query = """
+        INSERT OR REPLACE INTO SensorCombinations 
+        (Combo_ID, TA_ID, BRE_ID, IM_ID, MEM_ID, SN_total, TR_total, ST_total, RP_total, LOD_total, DR_total, HL_total, PC_total, Score, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor.execute(query, (
+                data['Combo_ID'], data.get('TA_ID'), data.get('BRE_ID'), data.get('IM_ID'),
+                data.get('MEM_ID'), data.get('SN_total'), data.get('TR_total'), data.get('ST_total'),
+                data.get('RP_total'), data.get('LOD_total'), data.get('DR_total'), data.get('HL_total'),
+                data.get('PC_total'), data.get('Score'), data.get('created_at')
+            ))
+            self.conn.commit()
+            self.clear_cache()
+            self.logger.info(f"Комбинация сенсора {data['Combo_ID']} успешно вставлена")
+            return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка вставки комбинации сенсора: {e}")
             return False
 
     @lru_cache(maxsize=32)
@@ -1036,11 +1126,13 @@ class BiosensorGUI:
 
         # Создание интерфейса
         self.sections = {}
-        self.create_menu()
-        self.create_notebook()
-        self.create_data_entry_tab()
-        self.create_database_tab()
-        self.create_analysis_tab()
+        #self.create_menu()
+        # self.create_notebook()
+        #self.create_data_entry_tab()
+        #self.create_database_tab()
+        #self.create_analysis_tab()
+
+        #self.create_menu()
 
     def get_default_config(self):
         """Возвращает конфигурацию по умолчанию для полей."""
@@ -1129,11 +1221,11 @@ class BiosensorGUI:
         st.sidebar.subheader("📁 Файл")
         col1, col2 = st.sidebar.columns(2)
         with col1:
-            if st.button("💾 Сохранить паспорт"):
-                self.save_passport()
+            if st.button("💾 Сохранить паспорт", key="menu_save_passport"):
+                self.save_passport_to_db_streamlit()
         with col2:
-            if st.button("📂 Загрузить паспорт"):
-                self.load_passport()
+            if st.button("📂 Загрузить паспорт", key="menu_load_passport"):
+                self.load_passport_from_db_streamlit()
     
         st.sidebar.divider()
     
@@ -1141,17 +1233,17 @@ class BiosensorGUI:
         st.sidebar.subheader("🔧 Инструменты")
         col3, col4 = st.sidebar.columns(2)
         with col3:
-            if st.button("🗑️ Очистить форму"):
-                self.clear_form()
+            if st.button("🗑️ Очистить форму", key="menu_clear_form"):
+                self.clear_form_streamlit()
         with col4:
-            if st.button("📊 Экспорт данных"):
+            if st.button("📊 Экспорт данных", key="menu_export_data"):
                 self.export_data()
     
         st.sidebar.divider()
     
         # Раздел "Справка"
         st.sidebar.subheader("❓ Справка")
-        if st.sidebar.button("ℹ️ О программе"):
+        if st.button("ℹ️ О программе", key="menu_about"):
             self.about()
 
     '''def create_notebook(self):
@@ -1162,7 +1254,7 @@ class BiosensorGUI:
         style.configure('TNotebook.Tab', padding=[20, 8])'''
 
     # streamlit
-    def create_notebook(self):
+    '''def create_notebook(self):
         """Создание вкладок интерфейса для Streamlit."""
         # В Streamlit вкладки создаются через st.tabs() вместо ttk.Notebook
         # Инициализируем session_state для управления активной вкладкой
@@ -1188,7 +1280,7 @@ class BiosensorGUI:
             self.create_database_tab()
         
         with self.tab_analysis:
-            self.create_analysis_tab()    
+            self.create_analysis_tab()'''    
 
     '''
     def create_data_entry_tab(self):
@@ -1634,13 +1726,13 @@ class BiosensorGUI:
         st.divider()
         btn_col1, btn_col2, btn_col3 = st.columns(3)
         with btn_col1:
-            if st.button("💾 Сохранить паспорт", key="save_btn", use_container_width=True):
+            if st.button("💾 Сохранить паспорт", key="save_btn", width="stretch"):
                 st.info("✅ Паспорт сохранён в базу данных")
         with btn_col2:
-            if st.button("🗑️ Очистить форму", key="clear_btn", use_container_width=True):
+            if st.button("🗑️ Очистить форму", key="clear_btn", width="stretch"):
                 st.info("✅ Форма очищена")
         with btn_col3:
-            if st.button("📁 Загрузить паспорт", key="load_btn", use_container_width=True):
+            if st.button("📁 Загрузить паспорт", key="load_btn", width="stretch"):
                 st.info("✅ Паспорт загружен из БД")    
 
     # В Streamlit метод create_sections() уже не нужен, так как вся логика ввода перенесена в create_data_entry_tab(). 
@@ -1704,23 +1796,23 @@ class BiosensorGUI:
         # Кнопки для выбора типа данных
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
-            if st.button("🎯 TA (аналиты)", use_container_width=True):
+            if st.button("🎯 TA (аналиты)", width="stretch"):
                 st.session_state.current_data_type = 'analytes'
                 st.session_state.current_page = 0
         with col2:
-            if st.button("🔴 BRE (биослои)", use_container_width=True):
+            if st.button("🔴 BRE (биослои)", width="stretch"):
                 st.session_state.current_data_type = 'bio_layers'
                 st.session_state.current_page = 0
         with col3:
-            if st.button("🟡 IM (иммобилизация)", use_container_width=True):
+            if st.button("🟡 IM (иммобилизация)", width="stretch"):
                 st.session_state.current_data_type = 'immobilization_layers'
                 st.session_state.current_page = 0
         with col4:
-            if st.button("🟣 MEM (мемристоры)", use_container_width=True):
+            if st.button("🟣 MEM (мемристоры)", width="stretch"):
                 st.session_state.current_data_type = 'memristive_layers'
                 st.session_state.current_page = 0
         with col5:
-            if st.button("🔄 Обновить", use_container_width=True):
+            if st.button("🔄 Обновить", width="stretch"):
                 st.rerun()
         
         st.divider()
@@ -1759,7 +1851,7 @@ class BiosensorGUI:
         # Отображение таблицы
         if data:
             df = __import__('pandas').DataFrame(data)
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width="stretch")
         else:
             st.info("Нет данных для отображения на этой странице.")
         
@@ -1768,7 +1860,7 @@ class BiosensorGUI:
         col_prev, col_page, col_next = st.columns(3)
         
         with col_prev:
-            if st.button("◀ Предыдущая", use_container_width=True, disabled=(current_page == 0)):
+            if st.button("◀ Предыдущая", width="stretch", disabled=(current_page == 0)):
                 st.session_state.current_page = max(0, current_page - 1)
                 st.rerun()
         
@@ -1776,7 +1868,7 @@ class BiosensorGUI:
             st.write(f"**Страница {current_page + 1}**", unsafe_allow_html=True)
         
         with col_next:
-            if st.button("Следующая ▶", use_container_width=True, disabled=(len(data) < page_size)):
+            if st.button("Следующая ▶", width="stretch", disabled=(len(data) < page_size)):
                 st.session_state.current_page = current_page + 1
                 st.rerun()
         
@@ -1812,15 +1904,15 @@ class BiosensorGUI:
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            if st.button("🏆 Лучшие комбинации", use_container_width=True):
+            if st.button("🏆 Лучшие комбинации", width="stretch"):
                 self.show_best_combinations()
         
         with col2:
-            if st.button("📊 Сравнительный анализ", use_container_width=True):
+            if st.button("📊 Сравнительный анализ", width="stretch"):
                 self.comparative_analysis()
         
         with col3:
-            if st.button("📈 Статистика", use_container_width=True):
+            if st.button("📈 Статистика", width="stretch"):
                 self.show_statistics()
         
         st.divider()
@@ -2048,7 +2140,7 @@ class BiosensorGUI:
 
             result = self.db_manager.insert_bio_recognition_layer(bio_data)
 
-             # Обработка результата в GUI слое
+            # Обработка результата в GUI слое
             if result == "DUPLICATE":
                 st.warning(f"⚠️ Биослой {bio_data['BRE_ID']} уже существует")
                 col1, col2 = st.columns([1, 1])
@@ -2098,11 +2190,43 @@ class BiosensorGUI:
                 'PC': st.session_state.get('immob_power_consumption')
             }
             
-            if immob_data['IM_ID']:
+            '''if immob_data['IM_ID']:
                 if self.db_manager.insert_immobilization_layer(immob_data):
                     st.success("✅ Иммобилизационный слой сохранён")
                     self.logger.info(f"Иммобилизационный слой {immob_data['IM_ID']} сохранён")
-            
+            '''
+
+            # Обработка результата в GUI слое
+            if immob_data['IM_ID']:
+                result = self.db_manager.insert_immobilization_layer(immob_data)
+
+                if result == "DUPLICATE":
+                    st.warning(f"⚠️ Иммобилизационный слой {immob_data['IM_ID']} уже существует")
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        if st.button("✅ Перезаписать", key=f"overwrite_immob_ui_{immob_data['IM_ID']}"):
+                            try:
+                                cur = self.db_manager.conn.cursor()
+                                cur.execute("DELETE FROM ImmobilizationLayers WHERE IM_ID = ?", (immob_data['IM_ID'],))
+                                self.db_manager.conn.commit()
+                                inserted = self.db_manager.insert_immobilization_layer(immob_data)
+                                if inserted is True:
+                                    st.success("✅ Иммобилизационный слой перезаписан")
+                                else:
+                                    st.error("❌ Ошибка при перезаписи иммобилизационного слоя")
+                                st.rerun()
+                            except Exception as e:
+                                self.logger.exception("Ошибка перезаписи иммобилизационного слоя")
+                                st.error(f"❌ Ошибка: {e}")
+                    with col2:
+                        if st.button("❌ Отмена", key=f"cancel_immob_ui_{immob_data['IM_ID']}"):
+                            st.info("Операция отменена")
+                elif result is True:
+                    st.success("✅ Иммобилизационный слой сохранён")
+                    self.logger.info(f"Иммобилизационный слой {immob_data['IM_ID']} сохранён")
+                else:
+                    st.error("❌ Не удалось сохранить иммобилизационный слой")
+
             # Сохранение мемристивного слоя
             mem_data = {
                 'MEM_ID': st.session_state.get('mem_mem_id', ''),
@@ -2123,13 +2247,102 @@ class BiosensorGUI:
                 'PC': st.session_state.get('mem_power_consumption')
             }
             
+            '''
             if mem_data['MEM_ID']:
                 if self.db_manager.insert_memristive_layer(mem_data):
                     st.success("✅ Мемристивный слой сохранён")
                     self.logger.info(f"Мемристивный слой {mem_data['MEM_ID']} сохранён")
+            '''
+
+            if not mem_data['MEM_ID']:
+                st.error("❌ ID мемристора не может быть пустым")
+                return
             
+            result = self.db_manager.insert_memristive_layer(mem_data)
+            
+            # Обработка результата в GUI слое
+            if result == "DUPLICATE":
+                st.warning(f"⚠️ Мемристивный слой {mem_data['MEM_ID']} уже существует")
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    if st.button("✅ Перезаписать", key=f"overwrite_mem_ui_{mem_data['MEM_ID']}"):
+                        try:
+                            cur = self.db_manager.conn.cursor()
+                            cur.execute("DELETE FROM MemristiveLayers WHERE MEM_ID = ?", (mem_data['MEM_ID'],))
+                            self.db_manager.conn.commit()
+                            inserted = self.db_manager.insert_memristive_layer(mem_data)
+                            if inserted is True:
+                                st.success("✅ Мемристивный слой перезаписан")
+                            else:
+                                st.error("❌ Ошибка при перезаписи мемристивного слоя")
+                            st.rerun()
+                        except Exception as e:
+                            self.logger.exception("Ошибка перезаписи мемристивного слоя")
+                            st.error(f"❌ Ошибка: {e}")
+                with col2:
+                    if st.button("❌ Отмена", key=f"cancel_mem_ui_{mem_data['MEM_ID']}"):
+                        st.info("Операция отменена")
+            elif result is True:
+                st.success("✅ Мемристивный слой сохранён")
+                self.logger.info(f"Мемристивный слой {mem_data['MEM_ID']} сохранён")
+            else:
+                st.error("❌ Не удалось сохранить мемристивный слой")
+
             st.success("✅ Все паспорты успешно сохранены!")
+
+            """Сохранение комбинации сенсора с Streamlit UI и обработкой дубликатов."""
+            combo_data = {
+                'Combo_ID': st.session_state.get('combo_id', ''),
+                'TA_ID': st.session_state.get('combo_ta_id', ''),
+                'BRE_ID': st.session_state.get('combo_bre_id', ''),
+                'IM_ID': st.session_state.get('combo_im_id', ''),
+                'MEM_ID': st.session_state.get('combo_mem_id', ''),
+                'SN_total': st.session_state.get('combo_sn_total'),
+                'TR_total': st.session_state.get('combo_tr_total'),
+                'ST_total': st.session_state.get('combo_st_total'),
+                'RP_total': st.session_state.get('combo_rp_total'),
+                'LOD_total': st.session_state.get('combo_lod_total'),
+                'DR_total': st.session_state.get('combo_dr_total', ''),
+                'HL_total': st.session_state.get('combo_hl_total'),
+                'PC_total': st.session_state.get('combo_pc_total'),
+                'Score': st.session_state.get('combo_score'),
+                'created_at': st.session_state.get('combo_created_at')
+            }
             
+            if not combo_data['Combo_ID']:
+                st.error("❌ ID комбинации не может быть пустым")
+                return
+            
+            result = self.db_manager.insert_sensor_combination(combo_data)
+            
+            # Обработка результата в GUI слое
+            if result == "DUPLICATE":
+                st.warning(f"⚠️ Комбинация {combo_data['Combo_ID']} уже существует")
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    if st.button("✅ Перезаписать", key=f"overwrite_combo_ui_{combo_data['Combo_ID']}"):
+                        try:
+                            cur = self.db_manager.conn.cursor()
+                            cur.execute("DELETE FROM SensorCombinations WHERE Combo_ID = ?", (combo_data['Combo_ID'],))
+                            self.db_manager.conn.commit()
+                            inserted = self.db_manager.insert_sensor_combination(combo_data)
+                            if inserted is True:
+                                st.success("✅ Комбинация сенсора перезаписана")
+                            else:
+                                st.error("❌ Ошибка при перезаписи комбинации сенсора")
+                            st.rerun()
+                        except Exception as e:
+                            self.logger.exception("Ошибка перезаписи комбинации сенсора")
+                            st.error(f"❌ Ошибка: {e}")
+                with col2:
+                    if st.button("❌ Отмена", key=f"cancel_combo_ui_{combo_data['Combo_ID']}"):
+                        st.info("Операция отменена")
+            elif result is True:
+                st.success("✅ Комбинация сенсора сохранена")
+                self.logger.info(f"Комбинация сенсора {combo_data['Combo_ID']} сохранена")
+            else:
+                st.error("❌ Не удалось сохранить комбинацию сенсора")
+                    
         except Exception as e:
             st.error(f"❌ Ошибка сохранения: {str(e)}")
             self.logger.error(f"Ошибка сохранения паспортов: {e}")
@@ -2344,7 +2557,7 @@ class BiosensorGUI:
         with col2:
             layer_id = st.text_input("Введите ID", key="load_layer_id")
         
-        if st.button("📥 Загрузить", key="load_execute_btn", use_container_width=True):
+        if st.button("📥 Загрузить", key="load_execute_btn", width="stretch"):
             if not layer_id:
                 st.error("❌ Введите ID!")
                 return
@@ -2480,7 +2693,7 @@ class BiosensorGUI:
             df = __import__('pandas').DataFrame(analytes)
             # выводим только основные столбцы в удобном виде
             cols = [c for c in ["TA_ID", "TA_Name", "PH_Min", "PH_Max", "T_Max", "ST"] if c in df.columns]
-            st.dataframe(df[cols], use_container_width=True)
+            st.dataframe(df[cols], width="stretch")
         else:
             st.info("Нет записей аналитов для отображения.")
 
@@ -2539,7 +2752,7 @@ class BiosensorGUI:
             import pandas as pd
             df = pd.DataFrame(bio_layers)
             cols = [c for c in ["BRE_ID", "BRE_Name", "PH_Min", "PH_Max", "T_Min", "T_Max", "SN"] if c in df.columns]
-            st.dataframe(df[cols], use_container_width=True)
+            st.dataframe(df[cols], width="stretch")
         else:
             st.info("Нет записей биораспознающих слоев для отображения.")
 
@@ -2597,7 +2810,7 @@ class BiosensorGUI:
             import pandas as pd
             df = pd.DataFrame(im_layers)
             cols = [c for c in ["IM_ID", "IM_Name", "PH_Min", "PH_Max", "T_Min", "T_Max", "MP"] if c in df.columns]
-            st.dataframe(df[cols], use_container_width=True)
+            st.dataframe(df[cols], width="stretch")
         else:
             st.info("Нет записей иммобилизационных слоев для отображения.")
 
@@ -2655,7 +2868,7 @@ class BiosensorGUI:
             import pandas as pd
             df = pd.DataFrame(mem_layers)
             cols = [c for c in ["MEM_ID", "MEM_Name", "PH_Min", "PH_Max", "T_Min", "T_Max", "SN"] if c in df.columns]
-            st.dataframe(df[cols], use_container_width=True)
+            st.dataframe(df[cols], width="stretch")
         else:
             st.info("Нет записей мемристивных слоёв для отображения.")
 
@@ -2773,13 +2986,13 @@ class BiosensorGUI:
 
         col_prev, col_label, col_next = st.columns([1, 1, 1])
         with col_prev:
-            if st.button("◀ Предыдущая", key=f"prev_{data_type}", disabled=disabled_prev, use_container_width=True):
+            if st.button("◀ Предыдущая", key=f"prev_{data_type}", disabled=disabled_prev, width="stretch"):
                 st.session_state['current_page'] = max(0, page - 1)
                 st.rerun()
         with col_label:
             st.markdown(f"**Страница {page + 1}**")
         with col_next:
-            if st.button("Следующая ▶", key=f"next_{data_type}", disabled=disabled_next, use_container_width=True):
+            if st.button("Следующая ▶", key=f"next_{data_type}", disabled=disabled_next, width="stretch"):
                 st.session_state['current_page'] = page + 1
                 st.rerun()
 
@@ -3092,12 +3305,43 @@ class BiosensorGUI:
     '''
 
     # streamlit version
-    def run(self):
+    '''def run(self):
         """Запуск приложения (Streamlit). Регистрируем закрытие БД при завершении процесса."""
         # В Streamlit нет mainloop(); интерфейс рендерится при импорте/вызове методов.
         # Регистрируем корректное закрытие соединения при завершении процесса.
         atexit.register(self.db_manager.close)
-        return None
+        return None'''
+    
+    def run(self):
+        """Главная функция запуска приложения (Streamlit)."""
+        # ✅ Регистрируем закрытие БД при завершении
+        atexit.register(self.db_manager.close)
+        
+        # ✅ Создаём меню
+        self.create_menu()
+        
+        # ✅ Создаём вкладки НАПРЯМУЮ (без рекурсии)
+        tabs = st.tabs([
+            "🔬 Ввод паспортов",
+            "📊 База данных",
+            "📈 Анализ"
+        ])
+        
+        # ✅ Заполняем содержимое вкладок
+        with tabs[0]:
+            self.create_data_entry_tab()
+        
+        with tabs[1]:
+            self.create_database_tab()
+        
+        with tabs[2]:
+            self.create_analysis_tab()
+
+@st.cache_resource
+def initialize_app():
+    """Инициализирует приложение один раз и сохраняет в кэш."""
+    app = BiosensorGUI()
+    return app
 
 if __name__ == "__main__":
     app = BiosensorGUI()
