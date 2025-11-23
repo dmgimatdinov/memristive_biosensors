@@ -14,13 +14,20 @@ import atexit
 logging.basicConfig(level=logging.INFO, filename='biosensor.log',
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
+def get_connection():
+    return sqlite3.connect("memristive_biosensor.db")
+
 class DatabaseManager:
     """Класс для управления операциями с базой данных SQLite для приложения BiosensorGUI."""
     def __init__(self, db_name="memristive_biosensor.db"):
         self.db_name = db_name
         self.logger = logging.getLogger(__name__)  # Инициализируем логгер ПЕРВЫМ
-        self.conn = sqlite3.connect(db_name)
-        self.conn.execute("PRAGMA foreign_keys = ON")  # Включение поддержки внешних ключей
+        
+        # self.conn = sqlite3.connect(db_name)
+        conn = get_connection()
+        conn.execute("PRAGMA foreign_keys = ON")  # Включение поддержки внешних ключей
+        conn.close()
+
         self.create_tables()
 
     def create_tables(self):
@@ -125,11 +132,13 @@ class DatabaseManager:
             """
         ]
         try:
-            cursor = self.conn.cursor()
-            for table in tables:
-                cursor.execute(table)
-            self.conn.commit()
-            self.logger.info("Таблицы успешно созданы")
+             # Создаем новое соединение для текущего потока
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                for table in tables:
+                    cursor.execute(table)
+                conn.commit()
+                self.logger.info("Таблицы успешно созданы")
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка создания таблиц: {e}")
 
@@ -202,28 +211,27 @@ class DatabaseManager:
     
     """Управление БД - БЕЗ Streamlit вызовов"""
     def insert_analyte(self, data: Dict[str, Any]) -> bool:
-        """Вставка или замена аналита."""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT TA_ID FROM Analytes WHERE TA_ID = ?", (data['TA_ID'],))
-        
-        if cursor.fetchone():
-            # ВАЖНО: Возвращаем специальный код вместо показа диалога
-            return "DUPLICATE"  # Сигнал о дубликате
-        
-        query = """
-        INSERT OR REPLACE INTO Analytes (TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, HL, PC)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """
+        """Вставка или замена аналита (создаёт новое соединение для каждого вызова)."""
         try:
-            cursor.execute(query, (
-                data['TA_ID'], data['TA_Name'], data.get('PH_Min'),
-                data.get('PH_Max'), data.get('T_Max'), data.get('ST'),
-                data.get('HL'), data.get('PC')
-            ))
-            self.conn.commit()
-            self.clear_cache()
-            self.logger.info(f"Аналит {data['TA_ID']} успешно вставлен")
-            return True
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT TA_ID FROM Analytes WHERE TA_ID = ?", (data['TA_ID'],))
+                if cursor.fetchone():
+                    return "DUPLICATE"  # Сигнал о дубликате
+
+                query = """
+                INSERT OR REPLACE INTO Analytes (TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, HL, PC)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                cursor.execute(query, (
+                    data['TA_ID'], data['TA_Name'], data.get('PH_Min'),
+                    data.get('PH_Max'), data.get('T_Max'), data.get('ST'),
+                    data.get('HL'), data.get('PC')
+                ))
+                conn.commit()
+                self.clear_cache()
+                self.logger.info(f"Аналит {data['TA_ID']} успешно вставлен")
+                return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки аналита: {e}")
             return False
@@ -300,29 +308,29 @@ class DatabaseManager:
     
     """Управление БД - БЕЗ Streamlit вызовов"""
     def insert_bio_recognition_layer(self, data: Dict[str, Any]) -> bool:
-        """Вставка или замена биораспознающего слоя (без Streamlit UI)."""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT BRE_ID FROM BioRecognitionLayers WHERE BRE_ID = ?", (data['BRE_ID'],))
-        if cursor.fetchone():
-            # Сигнализируем вызывающему коду, что запись уже существует
-            return "DUPLICATE"
-
-        query = """
-        INSERT OR REPLACE INTO BioRecognitionLayers 
-        (BRE_ID, BRE_Name, PH_Min, PH_Max, T_Min, T_Max, SN, DR_Min, DR_Max, RP, TR, ST, LOD, HL, PC)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
+        """Вставка или замена биораспознающего слоя (создаёт новое соединение для каждого вызова)."""
         try:
-            cursor.execute(query, (
-                data['BRE_ID'], data['BRE_Name'], data.get('PH_Min'), data.get('PH_Max'),
-                data.get('T_Min'), data.get('T_Max'), data.get('SN'), data.get('DR_Min'),
-                data.get('DR_Max'), data.get('RP'), data.get('TR'), data.get('ST'),
-                data.get('LOD'), data.get('HL'), data.get('PC')
-            ))
-            self.conn.commit()
-            self.clear_cache()
-            self.logger.info(f"Биослой {data['BRE_ID']} успешно вставлен")
-            return True
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT BRE_ID FROM BioRecognitionLayers WHERE BRE_ID = ?", (data['BRE_ID'],))
+                if cursor.fetchone():
+                    return "DUPLICATE"
+
+                query = """
+                INSERT OR REPLACE INTO BioRecognitionLayers 
+                (BRE_ID, BRE_Name, PH_Min, PH_Max, T_Min, T_Max, SN, DR_Min, DR_Max, RP, TR, ST, LOD, HL, PC)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                cursor.execute(query, (
+                    data['BRE_ID'], data['BRE_Name'], data.get('PH_Min'), data.get('PH_Max'),
+                    data.get('T_Min'), data.get('T_Max'), data.get('SN'), data.get('DR_Min'),
+                    data.get('DR_Max'), data.get('RP'), data.get('TR'), data.get('ST'),
+                    data.get('LOD'), data.get('HL'), data.get('PC')
+                ))
+                conn.commit()
+                self.clear_cache()
+                self.logger.info(f"Биослой {data['BRE_ID']} успешно вставлен")
+                return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки биослоя: {e}")
             return False
@@ -399,29 +407,29 @@ class DatabaseManager:
     
     """Управление БД - БЕЗ Streamlit вызовов"""
     def insert_immobilization_layer(self, data: Dict[str, Any]) -> bool:
-        """Вставка или замена иммобилизационного слоя (без Streamlit UI)."""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT IM_ID FROM ImmobilizationLayers WHERE IM_ID = ?", (data['IM_ID'],))
-        if cursor.fetchone():
-            # Сигнализируем вызывающему коду, что запись уже существует
-            return "DUPLICATE"
-
-        query = """
-        INSERT OR REPLACE INTO ImmobilizationLayers 
-        (IM_ID, IM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, Adh, Sol, K_IM, RP, TR, ST, HL, PC)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
+        """Вставка или замена иммобилизационного слоя (создаёт новое соединение для каждого вызова)."""
         try:
-            cursor.execute(query, (
-                data['IM_ID'], data['IM_Name'], data.get('PH_Min'), data.get('PH_Max'),
-                data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('Adh'),
-                data.get('Sol'), data.get('K_IM'), data.get('RP'), data.get('TR'),
-                data.get('ST'), data.get('HL'), data.get('PC')
-            ))
-            self.conn.commit()
-            self.clear_cache()
-            self.logger.info(f"Иммобилизационный слой {data['IM_ID']} успешно вставлен")
-            return True
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT IM_ID FROM ImmobilizationLayers WHERE IM_ID = ?", (data['IM_ID'],))
+                if cursor.fetchone():
+                    return "DUPLICATE"
+
+                query = """
+                INSERT OR REPLACE INTO ImmobilizationLayers 
+                (IM_ID, IM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, Adh, Sol, K_IM, RP, TR, ST, HL, PC)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                cursor.execute(query, (
+                    data['IM_ID'], data['IM_Name'], data.get('PH_Min'), data.get('PH_Max'),
+                    data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('Adh'),
+                    data.get('Sol'), data.get('K_IM'), data.get('RP'), data.get('TR'),
+                    data.get('ST'), data.get('HL'), data.get('PC')
+                ))
+                conn.commit()
+                self.clear_cache()
+                self.logger.info(f"Иммобилизационный слой {data['IM_ID']} успешно вставлен")
+                return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки иммобилизационного слоя: {e}")
             return False
@@ -527,29 +535,29 @@ class DatabaseManager:
     # DatabaseManager class method - CLEAN (no Streamlit UI)
 
     def insert_memristive_layer(self, data: Dict[str, Any]) -> bool:
-        """Вставка или замена мемристивного слоя (без Streamlit UI)."""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT MEM_ID FROM MemristiveLayers WHERE MEM_ID = ?", (data['MEM_ID'],))
-        if cursor.fetchone():
-            # Сигнализируем вызывающему коду, что запись уже существует
-            return "DUPLICATE"
-
-        query = """
-        INSERT OR REPLACE INTO MemristiveLayers 
-        (MEM_ID, MEM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, SN, DR_Min, DR_Max, RP, TR, ST, LOD, HL, PC)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
+        """Вставка или замена мемристивного слоя (создаёт новое соединение для каждого вызова)."""
         try:
-            cursor.execute(query, (
-                data['MEM_ID'], data['MEM_Name'], data.get('PH_Min'), data.get('PH_Max'),
-                data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('SN'),
-                data.get('DR_Min'), data.get('DR_Max'), data.get('RP'), data.get('TR'),
-                data.get('ST'), data.get('LOD'), data.get('HL'), data.get('PC')
-            ))
-            self.conn.commit()
-            self.clear_cache()
-            self.logger.info(f"Мемристивный слой {data['MEM_ID']} успешно вставлен")
-            return True
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT MEM_ID FROM MemristiveLayers WHERE MEM_ID = ?", (data['MEM_ID'],))
+                if cursor.fetchone():
+                    return "DUPLICATE"
+
+                query = """
+                INSERT OR REPLACE INTO MemristiveLayers 
+                (MEM_ID, MEM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, SN, DR_Min, DR_Max, RP, TR, ST, LOD, HL, PC)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                cursor.execute(query, (
+                    data['MEM_ID'], data['MEM_Name'], data.get('PH_Min'), data.get('PH_Max'),
+                    data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('SN'),
+                    data.get('DR_Min'), data.get('DR_Max'), data.get('RP'), data.get('TR'),
+                    data.get('ST'), data.get('LOD'), data.get('HL'), data.get('PC')
+                ))
+                conn.commit()
+                self.clear_cache()
+                self.logger.info(f"Мемристивный слой {data['MEM_ID']} успешно вставлен")
+                return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки мемристивного слоя: {e}")
             return False
@@ -600,33 +608,33 @@ class DatabaseManager:
 # DatabaseManager class method - CLEAN (no Streamlit UI)
 
     def insert_sensor_combination(self, data: Dict[str, Any]) -> bool:
-        """Вставка или замена комбинации сенсора (без Streamlit UI)."""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT Combo_ID FROM SensorCombinations WHERE Combo_ID = ?", (data['Combo_ID'],))
-        if cursor.fetchone():
-            # Сигнализируем вызывающему коду, что запись уже существует
-            return "DUPLICATE"
-
-        query = """
-        INSERT OR REPLACE INTO SensorCombinations 
-        (Combo_ID, TA_ID, BRE_ID, IM_ID, MEM_ID, SN_total, TR_total, ST_total, RP_total, LOD_total, DR_total, HL_total, PC_total, Score, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
+        """Вставка или замена комбинации сенсора (создаёт новое соединение для каждого вызова)."""
         try:
-            cursor.execute(query, (
-                data['Combo_ID'], data.get('TA_ID'), data.get('BRE_ID'), data.get('IM_ID'),
-                data.get('MEM_ID'), data.get('SN_total'), data.get('TR_total'), data.get('ST_total'),
-                data.get('RP_total'), data.get('LOD_total'), data.get('DR_total'), data.get('HL_total'),
-                data.get('PC_total'), data.get('Score'), data.get('created_at')
-            ))
-            self.conn.commit()
-            self.clear_cache()
-            self.logger.info(f"Комбинация сенсора {data['Combo_ID']} успешно вставлена")
-            return True
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT Combo_ID FROM SensorCombinations WHERE Combo_ID = ?", (data['Combo_ID'],))
+                if cursor.fetchone():
+                    return "DUPLICATE"
+
+                query = """
+                INSERT OR REPLACE INTO SensorCombinations 
+                (Combo_ID, TA_ID, BRE_ID, IM_ID, MEM_ID, SN_total, TR_total, ST_total, RP_total, LOD_total, DR_total, HL_total, PC_total, Score, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                cursor.execute(query, (
+                    data['Combo_ID'], data.get('TA_ID'), data.get('BRE_ID'), data.get('IM_ID'),
+                    data.get('MEM_ID'), data.get('SN_total'), data.get('TR_total'), data.get('ST_total'),
+                    data.get('RP_total'), data.get('LOD_total'), data.get('DR_total'), data.get('HL_total'),
+                    data.get('PC_total'), data.get('Score'), data.get('created_at')
+                ))
+                conn.commit()
+                self.clear_cache()
+                self.logger.info(f"Комбинация сенсора {data['Combo_ID']} успешно вставлена")
+                return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки комбинации сенсора: {e}")
             return False
-
+    
     @lru_cache(maxsize=32)
     def list_all_analytes(self) -> List[Dict[str, Any]]:
         """Получение всех аналитов с выбором конкретных столбцов."""
@@ -636,12 +644,13 @@ class DatabaseManager:
         ORDER BY TA_Name
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query)
-            columns = [description[0] for description in cursor.description]
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            self.logger.info(f"Получено {len(results)} аналитов")
-            return results
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query)
+                columns = [description[0] for description in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                self.logger.info(f"Получено {len(results)} аналитов")
+                return results
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения аналитов: {e}")
             return []
@@ -655,12 +664,13 @@ class DatabaseManager:
         ORDER BY BRE_Name
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query)
-            columns = [description[0] for description in cursor.description]
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            self.logger.info(f"Получено {len(results)} биослоев")
-            return results
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query)
+                columns = [description[0] for description in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                self.logger.info(f"Получено {len(results)} биослоев")
+                return results
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения биослоев: {e}")
             return []
@@ -674,12 +684,13 @@ class DatabaseManager:
         ORDER BY IM_Name
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query)
-            columns = [description[0] for description in cursor.description]
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            self.logger.info(f"Получено {len(results)} иммобилизационных слоев")
-            return results
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query)
+                columns = [description[0] for description in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                self.logger.info(f"Получено {len(results)} иммобилизационных слоев")
+                return results
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения иммобилизационных слоев: {e}")
             return []
@@ -693,12 +704,13 @@ class DatabaseManager:
         ORDER BY MEM_Name
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query)
-            columns = [description[0] for description in cursor.description]
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            self.logger.info(f"Получено {len(results)} мемристивных слоев")
-            return results
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query)
+                columns = [description[0] for description in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                self.logger.info(f"Получено {len(results)} мемристивных слоев")
+                return results
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения мемристивных слоев: {e}")
             return []
@@ -712,12 +724,13 @@ class DatabaseManager:
         ORDER BY Combo_ID
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query)
-            columns = [description[0] for description in cursor.description]
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            self.logger.info(f"Получено {len(results)} комбинаций сенсоров")
-            return results
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query)
+                columns = [description[0] for description in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                self.logger.info(f"Получено {len(results)} комбинаций сенсоров")
+                return results
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения комбинаций сенсоров: {e}")
             return []
@@ -731,12 +744,13 @@ class DatabaseManager:
         LIMIT ? OFFSET ?
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query, (limit, offset))
-            columns = [description[0] for description in cursor.description]
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            self.logger.info(f"Получено {len(results)} аналитов (страница)")
-            return results
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (limit, offset))
+                columns = [description[0] for description in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                self.logger.info(f"Получено {len(results)} аналитов (страница)")
+                return results
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения аналитов с пагинацией: {e}")
             return []
@@ -750,12 +764,13 @@ class DatabaseManager:
         LIMIT ? OFFSET ?
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query, (limit, offset))
-            columns = [description[0] for description in cursor.description]
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            self.logger.info(f"Получено {len(results)} биослоев (страница)")
-            return results
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (limit, offset))
+                columns = [description[0] for description in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                self.logger.info(f"Получено {len(results)} биослоев (страница)")
+                return results
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения биослоев с пагинацией: {e}")
             return []
@@ -769,12 +784,13 @@ class DatabaseManager:
         LIMIT ? OFFSET ?
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query, (limit, offset))
-            columns = [description[0] for description in cursor.description]
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            self.logger.info(f"Получено {len(results)} иммобилизационных слоев (страница)")
-            return results
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (limit, offset))
+                columns = [description[0] for description in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                self.logger.info(f"Получено {len(results)} иммобилизационных слоев (страница)")
+                return results
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения иммобилизационных слоев с пагинацией: {e}")
             return []
@@ -788,12 +804,13 @@ class DatabaseManager:
         LIMIT ? OFFSET ?
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query, (limit, offset))
-            columns = [description[0] for description in cursor.description]
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            self.logger.info(f"Получено {len(results)} мемристивных слоев (страница)")
-            return results
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (limit, offset))
+                columns = [description[0] for description in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                self.logger.info(f"Получено {len(results)} мемристивных слоев (страница)")
+                return results
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения мемристивных слоев с пагинацией: {e}")
             return []
@@ -807,12 +824,13 @@ class DatabaseManager:
         LIMIT ? OFFSET ?
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query, (limit, offset))
-            columns = [description[0] for description in cursor.description]
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            self.logger.info(f"Получено {len(results)} комбинаций сенсоров (страница)")
-            return results
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (limit, offset))
+                columns = [description[0] for description in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                self.logger.info(f"Получено {len(results)} комбинаций сенсоров (страница)")
+                return results
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения комбинаций сенсоров с пагинацией: {e}")
             return []
@@ -825,14 +843,15 @@ class DatabaseManager:
         WHERE TA_ID = ?
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query, (ta_id,))
-            result = cursor.fetchone()
-            if result:
-                columns = [description[0] for description in cursor.description]
-                self.logger.info(f"Получен аналит {ta_id}")
-                return dict(zip(columns, result))
-            return None
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (ta_id,))
+                result = cursor.fetchone()
+                if result:
+                    columns = [description[0] for description in cursor.description]
+                    self.logger.info(f"Получен аналит {ta_id}")
+                    return dict(zip(columns, result))
+                return None
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения аналита {ta_id}: {e}")
             return None
@@ -845,14 +864,15 @@ class DatabaseManager:
         WHERE BRE_ID = ?
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query, (bre_id,))
-            result = cursor.fetchone()
-            if result:
-                columns = [description[0] for description in cursor.description]
-                self.logger.info(f"Получен биослой {bre_id}")
-                return dict(zip(columns, result))
-            return None
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (bre_id,))
+                result = cursor.fetchone()
+                if result:
+                    columns = [description[0] for description in cursor.description]
+                    self.logger.info(f"Получен биослой {bre_id}")
+                    return dict(zip(columns, result))
+                return None
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения биослоя {bre_id}: {e}")
             return None
@@ -865,14 +885,15 @@ class DatabaseManager:
         WHERE IM_ID = ?
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query, (im_id,))
-            result = cursor.fetchone()
-            if result:
-                columns = [description[0] for description in cursor.description]
-                self.logger.info(f"Получен иммобилизационный слой {im_id}")
-                return dict(zip(columns, result))
-            return None
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (im_id,))
+                result = cursor.fetchone()
+                if result:
+                    columns = [description[0] for description in cursor.description]
+                    self.logger.info(f"Получен иммобилизационный слой {im_id}")
+                    return dict(zip(columns, result))
+                return None
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения иммобилизационного слоя {im_id}: {e}")
             return None
@@ -885,14 +906,15 @@ class DatabaseManager:
         WHERE MEM_ID = ?
         """
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query, (mem_id,))
-            result = cursor.fetchone()
-            if result:
-                columns = [description[0] for description in cursor.description]
-                self.logger.info(f"Получен мемристивный слой {mem_id}")
-                return dict(zip(columns, result))
-            return None
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (mem_id,))
+                result = cursor.fetchone()
+                if result:
+                    columns = [description[0] for description in cursor.description]
+                    self.logger.info(f"Получен мемристивный слой {mem_id}")
+                    return dict(zip(columns, result))
+                return None
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения мемристивного слоя {mem_id}: {e}")
             return None
@@ -906,10 +928,10 @@ class DatabaseManager:
         self.list_all_sensor_combinations.cache_clear()
         self.logger.info("Кэш очищен")
 
-    def close(self):
+    '''def close(self):
         """Закрытие соединения с базой данных."""
         self.conn.close()
-        self.logger.info("Соединение с базой данных закрыто")
+        self.logger.info("Соединение с базой данных закрыто")'''
 
 '''class Section:
     """Базовый класс для секций ввода в GUI."""
@@ -2123,9 +2145,10 @@ class BiosensorGUI:
                 with col1:
                     if st.button("✅ Перезаписать", key=f"overwrite_analyte_{analyte_data['TA_ID']}"):
                         # Удалить существующий и вставить новый
-                        cursor = self.db_manager.conn.cursor()
-                        cursor.execute("DELETE FROM Analytes WHERE TA_ID = ?", (analyte_data['TA_ID'],))
-                        self.db_manager.conn.commit()
+                        with get_connection() as conn:
+                            cursor = conn.cursor()
+                            cursor.execute("DELETE FROM Analytes WHERE TA_ID = ?", (analyte_data['TA_ID'],))
+                            conn.commit()
                         self.db_manager.insert_analyte(analyte_data)
                         st.success("✅ Аналит перезаписан!")
                 with col2:
@@ -2176,9 +2199,10 @@ class BiosensorGUI:
                     if st.button("✅ Перезаписать", key=f"overwrite_bio_ui_{bio_data['BRE_ID']}"):
                         try:
                             # Удаляем существующую запись и пробуем вставить снова
-                            cur = self.db_manager.conn.cursor()
-                            cur.execute("DELETE FROM BioRecognitionLayers WHERE BRE_ID = ?", (bio_data['BRE_ID'],))
-                            self.db_manager.conn.commit()
+                            with get_connection() as conn:
+                                cur = conn.cursor()
+                                cur.execute("DELETE FROM BioRecognitionLayers WHERE BRE_ID = ?", (bio_data['BRE_ID'],))
+                                conn.commit()
                             inserted = self.db_manager.insert_bio_recognition_layer(bio_data)
                             if inserted is True:
                                 st.success("✅ Биослой перезаписан")
@@ -2234,9 +2258,10 @@ class BiosensorGUI:
                     with col1:
                         if st.button("✅ Перезаписать", key=f"overwrite_immob_ui_{immob_data['IM_ID']}"):
                             try:
-                                cur = self.db_manager.conn.cursor()
-                                cur.execute("DELETE FROM ImmobilizationLayers WHERE IM_ID = ?", (immob_data['IM_ID'],))
-                                self.db_manager.conn.commit()
+                                with get_connection() as conn:
+                                    cur = conn.cursor()
+                                    cur.execute("DELETE FROM ImmobilizationLayers WHERE IM_ID = ?", (immob_data['IM_ID'],))
+                                    conn.commit()
                                 inserted = self.db_manager.insert_immobilization_layer(immob_data)
                                 if inserted is True:
                                     st.success("✅ Иммобилизационный слой перезаписан")
@@ -2295,9 +2320,10 @@ class BiosensorGUI:
                 with col1:
                     if st.button("✅ Перезаписать", key=f"overwrite_mem_ui_{mem_data['MEM_ID']}"):
                         try:
-                            cur = self.db_manager.conn.cursor()
-                            cur.execute("DELETE FROM MemristiveLayers WHERE MEM_ID = ?", (mem_data['MEM_ID'],))
-                            self.db_manager.conn.commit()
+                            with get_connection() as conn:
+                                cur = conn.cursor()
+                                cur.execute("DELETE FROM MemristiveLayers WHERE MEM_ID = ?", (mem_data['MEM_ID'],))
+                                conn.commit()
                             inserted = self.db_manager.insert_memristive_layer(mem_data)
                             if inserted is True:
                                 st.success("✅ Мемристивный слой перезаписан")
@@ -2350,9 +2376,10 @@ class BiosensorGUI:
                 with col1:
                     if st.button("✅ Перезаписать", key=f"overwrite_combo_ui_{combo_data['Combo_ID']}"):
                         try:
-                            cur = self.db_manager.conn.cursor()
-                            cur.execute("DELETE FROM SensorCombinations WHERE Combo_ID = ?", (combo_data['Combo_ID'],))
-                            self.db_manager.conn.commit()
+                            with get_connection() as conn:
+                                cur = conn.cursor()
+                                cur.execute("DELETE FROM SensorCombinations WHERE Combo_ID = ?", (combo_data['Combo_ID'],))
+                                conn.commit()
                             inserted = self.db_manager.insert_sensor_combination(combo_data)
                             if inserted is True:
                                 st.success("✅ Комбинация сенсора перезаписана")
@@ -3195,22 +3222,23 @@ class BiosensorGUI:
     def show_statistics(self):
         """Отображение статистики базы данных."""
         try:
-            cursor = self.db_manager.conn.cursor()
-            
-            cursor.execute("SELECT COUNT(*) FROM Analytes")
-            analytes_count = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM BioRecognitionLayers")
-            bio_count = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM ImmobilizationLayers")
-            immob_count = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM MemristiveLayers")
-            mem_count = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM SensorCombinations")
-            combo_count = cursor.fetchone()[0]
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute("SELECT COUNT(*) FROM Analytes")
+                analytes_count = cursor.fetchone()[0]
+                
+                cursor.execute("SELECT COUNT(*) FROM BioRecognitionLayers")
+                bio_count = cursor.fetchone()[0]
+                
+                cursor.execute("SELECT COUNT(*) FROM ImmobilizationLayers")
+                immob_count = cursor.fetchone()[0]
+                
+                cursor.execute("SELECT COUNT(*) FROM MemristiveLayers")
+                mem_count = cursor.fetchone()[0]
+                
+                cursor.execute("SELECT COUNT(*) FROM SensorCombinations")
+                combo_count = cursor.fetchone()[0]
             
             stats = f"""=== СТАТИСТИКА БАЗЫ ДАННЫХ ===
 
@@ -3343,7 +3371,7 @@ class BiosensorGUI:
     def run(self):
         """Главная функция запуска приложения (Streamlit)."""
         # ✅ Регистрируем закрытие БД при завершении
-        atexit.register(self.db_manager.close)
+        # atexit.register(self.db_manager.close)
         
         # ✅ Инициализируем session_state с помощью setdefault()
         st.session_state.setdefault('active_section', 'data_entry')
