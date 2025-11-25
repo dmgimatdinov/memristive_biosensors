@@ -17,6 +17,10 @@ logging.basicConfig(level=logging.INFO, filename='biosensor.log',
 def get_connection():
     return sqlite3.connect("memristive_biosensor.db")
 
+def debug(message):
+    # st.write(f"DEBUG: {message}")
+    print(f"DEBUG: {message}")
+
 class DatabaseManager:
     """Класс для управления операциями с базой данных SQLite для приложения BiosensorGUI."""
     def __init__(self, db_name="memristive_biosensor.db"):
@@ -1245,6 +1249,7 @@ class BiosensorGUI:
     # streamlit
     def create_menu(self):
         # """Создание меню приложения для Streamlit."""
+        debug("create_menu")
     
         # Создание боковой панели с меню
         st.sidebar.title("Меню")
@@ -1282,7 +1287,9 @@ class BiosensorGUI:
         st.sidebar.subheader("🔧 Инструменты")
         col3, col4 = st.sidebar.columns(2)
         with col3:
+            debug("create_menu: col3")
             if st.button("🗑️ Очистить", key="menu_clear_form", width="stretch"):
+                debug("Зажата кнопка Очистить")
                 self.clear_form_streamlit()
         with col4:
             if st.button("📊 Экспорт", key="menu_export_data", width="stretch"):
@@ -2126,7 +2133,6 @@ class BiosensorGUI:
                 'PC': st.session_state.get('analyte_power_consumption')
             }
             
-            
             '''if analyte_data['TA_ID']:
                 if self.db_manager.insert_analyte(analyte_data):
                     st.success("✅ Аналит сохранён")
@@ -2435,6 +2441,7 @@ class BiosensorGUI:
     # streamlit
     def clear_form_streamlit(self):
         """Очистка формы (перезагрузка страницы)."""
+        debug("clear_form_streamlit")
         st.session_state.clear()
         st.info("✅ Форма очищена. Страница перезагружена.")
         st.rerun()
@@ -2629,6 +2636,7 @@ class BiosensorGUI:
                         st.session_state['analyte_stability'] = data['ST']
                         st.session_state['analyte_half_life'] = data['HL']
                         st.session_state['analyte_power_consumption'] = data['PC']
+                        st.session_state['active_section'] = 'data_entry'
                         st.success("✅ Аналит загружен!")
                         st.rerun()
                     else:
@@ -2799,6 +2807,7 @@ class BiosensorGUI:
         page_size = st.session_state.get('page_size', self.page_size)
         current_page = st.session_state.get('current_page', 0)
         offset = current_page * page_size
+        
 
         bio_layers = self.db_manager.list_all_bio_recognition_layers_paginated(page_size, offset)
 
@@ -3372,10 +3381,13 @@ class BiosensorGUI:
         """Главная функция запуска приложения (Streamlit)."""
         # ✅ Регистрируем закрытие БД при завершении
         # atexit.register(self.db_manager.close)
-        
+        debug("Приложение запущено")
+
         # ✅ Инициализируем session_state с помощью setdefault()
-        st.session_state.setdefault('active_section', 'data_entry')
-        
+        # st.session_state.setdefault('active_section', 'data_entry')
+        if 'active_section' not in st.session_state:
+            st.session_state['active_section'] = 'data_entry'
+
         # ✅ Создаём меню в боковой панели
         self.create_menu()
         
