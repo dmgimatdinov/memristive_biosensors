@@ -11,12 +11,15 @@ import atexit
 logging.basicConfig(level=logging.INFO, filename='biosensor.log',
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 def get_connection():
     return sqlite3.connect("memristive_biosensor.db")
+
 
 def debug(message):
     # st.write(f"DEBUG: {message}")
     print(f"DEBUG: {message}")
+
 
 class DatabaseManager:
     """Класс для управления операциями с базой данных SQLite для приложения BiosensorGUI."""
@@ -133,7 +136,7 @@ class DatabaseManager:
             """
         ]
         try:
-             # Создаем новое соединение для текущего потока
+            # Создаем новое соединение для текущего потока
             with get_connection() as conn:
                 cursor = conn.cursor()
                 for table in tables:
@@ -577,6 +580,7 @@ class DatabaseManager:
         self.list_all_sensor_combinations.cache_clear()
         self.logger.info("Кэш очищен")
 
+
 class BiosensorGUI:
     """GUI-приложение для управления паспортами мемристивных биосенсоров."""
     def __init__(self):
@@ -672,7 +676,8 @@ class BiosensorGUI:
         # Создание интерфейса
         self.sections = {}
 
-    def get_default_config(self):
+    @staticmethod
+    def get_default_config():
         """Возвращает конфигурацию по умолчанию для полей."""
         return {
             'analyte': [
@@ -788,7 +793,8 @@ class BiosensorGUI:
             st.rerun()
             
     # streamlit
-    def create_data_entry_tab(self):
+    @staticmethod
+    def create_data_entry_tab():
         """Создание вкладки ввода паспортов для Streamlit."""
         st.header("🔬 Ввод паспорта биосенсора v2.0")
         
@@ -1676,7 +1682,8 @@ class BiosensorGUI:
         return 0
 
     # streamlit
-    def clear_form_streamlit(self):
+    @staticmethod
+    def clear_form_streamlit():
         """Очистка формы (перезагрузка страницы)."""
         debug("clear_form_streamlit")
         st.session_state.clear()
@@ -1848,7 +1855,6 @@ class BiosensorGUI:
         page_size = st.session_state.get('page_size', self.page_size)
         current_page = st.session_state.get('current_page', 0)
         offset = current_page * page_size
-        
 
         bio_layers = self.db_manager.list_all_bio_recognition_layers_paginated(page_size, offset)
 
@@ -2084,7 +2090,8 @@ class BiosensorGUI:
             st.error("❌ Ошибка при выполнении анализа")
 
     # streamlit version
-    def show_statistics(self):
+    @staticmethod
+    def show_statistics():
         """Отображение статистики базы данных."""
         try:
             with get_connection() as conn:
