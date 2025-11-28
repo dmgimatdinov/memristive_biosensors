@@ -1337,7 +1337,7 @@ class BiosensorGUI:
         try:
             # Сохранение аналита
             analyte_data = {
-                'TA_ID': st.session_state.get('analyte_ta_id', ''),
+                'TA_ID': st.session_state.get('analyte_ta_id', '', cache=False),
                 'TA_Name': st.session_state.get('analyte_ta_name', ''),
                 'PH_Min': st.session_state.get('analyte_ph_min'),
                 'PH_Max': st.session_state.get('analyte_ph_max'),
@@ -1602,7 +1602,75 @@ class BiosensorGUI:
             st.error(f"❌ Ошибка сохранения: {str(e)}")
             self.logger.error(f"Ошибка сохранения паспортов: {e}")
 
-            
+    def create_sensor_combinations(self):
+        """Создание комбинаций сенсоров на основе пересечения диапазонов pH и температур."""
+        try:
+            # Загрузка одного паспорта каждого типа
+            analyte = self.db_manager.get_analyte_by_id("TA001")  # Укажите ID аналита
+            bio_layer = self.db_manager.get_bio_recognition_layer_by_id("BRE001")  # Укажите ID биослоя
+            immob_layer = self.db_manager.get_immobilization_layer_by_id("IM001")  # Укажите ID иммобилизации
+            mem_layer = self.db_manager.get_memristive_layer_by_id("MEM001")  # Укажите ID мемристора
+
+            # Проверка наличия всех данных
+            if not (analyte and bio_layer and immob_layer and mem_layer):
+                st.error("❌ Не удалось загрузить все слои. Проверьте наличие данных в базе.")
+                return
+
+            # Извлечение диапазонов pH
+            analyte_ph_min, analyte_ph_max = analyte['PH_Min'], analyte['PH_Max']
+            bio_ph_min, bio_ph_max = bio_layer['PH_Min'], bio_layer['PH_Max']
+            immob_ph_min, immob_ph_max = immob_layer['PH_Min'], immob_layer['PH_Max']
+            mem_ph_min, mem_ph_max = mem_layer['PH_Min'], mem_layer['PH_Max']
+
+            # Проверка пересечения диапазонов pH
+            if not (analyte_ph_min <= bio_ph_max and analyte_ph_max >= bio_ph_min and
+                    analyte_ph_min <= immob_ph_max and analyte_ph_max >= immob_ph_min and
+                    analyte_ph_min <= mem_ph_max and analyte_ph_max >= mem_ph_min):
+                st.info("ℹ️ Диапазоны pH не пересекаются. Комбинация не создана.")
+                return
+
+            # Извлечение температур
+            analyte_t_max = analyte['T_Max']
+            bio_t_max = bio_layer['T_Max']
+            immob_t_max = immob_layer['T_Max']
+            mem_t_max = mem_layer['T_Max']
+
+            # Проверка температур
+            if not (bio_t_max < analyte_t_max and immob_t_max < analyte_t_max and mem_t_max < analyte_t_max):
+                st.info("ℹ️ Температура одного из слоёв превышает температуру аналита. Комбинация не создана.")
+                return
+
+            # Если все проверки пройдены, создаём комбинацию
+            combination_data = {
+                'Combo_ID': "COMBO001",  # Уникальный ID комбинации
+                'TA_ID': analyte['TA_ID'],
+                'BRE_ID': bio_layer['BRE_ID'],
+                'IM_ID': immob_layer['IM_ID'],
+                'MEM_ID': mem_layer['MEM_ID'],
+                'SN_total': None,  # Здесь можно рассчитать итоговые значения
+                'TR_total': None,
+                'ST_total': None,
+                'RP_total': None,
+                'LOD_total': None,
+                'DR_total': None,
+                'HL_total': None,
+                'PC_total': None,
+                'Score': None,  # Здесь можно рассчитать итоговый балл
+                'created_at': None  # Автоматически заполняется в БД
+            }
+
+            # Добавление комбинации в базу данных
+            result = self.db_manager.insert_sensor_combination(combination_data)
+            if result == "DUPLICATE":
+                st.warning(f"⚠️ Комбинация {combination_data['Combo_ID']} уже существует.")
+            elif result:
+                st.success(f"✅ Комбинация {combination_data['Combo_ID']} успешно добавлена в базу данных.")
+            else:
+                st.error("❌ Ошибка добавления комбинации в базу данных.")
+        except Exception as e:
+            st.error(f"❌ Ошибка при создании комбинации: {str(e)}")
+            self.logger.error(f"Ошибка при создании комбинации: {e}")
+
     def save_sensor_combinations_to_db(self):
         
         return 0
@@ -1619,7 +1687,7 @@ class BiosensorGUI:
     def load_passport_from_db_streamlit(self):
         """Загрузка паспорта из БД для Streamlit."""
         st.subheader("📂 Загрузить паспорт из БД")
-        
+        debug("load_passport_from_db_streamlit")
         col1, col2 = st.columns(2)
         
         with col1:
@@ -1628,20 +1696,28 @@ class BiosensorGUI:
                 ["Аналит (TA)", "Биослой (BRE)", "Иммобилизация (IM)", "Мемристор (MEM)"],
                 key="load_data_type"
             )
+            debug("Выберите тип данных")
         
+        debug(data_type)
         with col2:
-            layer_id = st.text_input("Введите ID", key="load_layer_id")
-        
+            layer_id = st.text_input("Введите ID", key="load_layer_id", value="test")
+            
+        debug(st.session_state.get('load_layer_id'))
+
         if st.button("📥 Загрузить", key="load_execute_btn", width="stretch"):
+            debug("Зажата клавиша Загрузить")
             if not layer_id:
                 st.error("❌ Введите ID!")
                 return
             
             try:
+                debug("try)analyte")
                 if data_type == "Аналит (TA)":
                     data = self.db_manager.get_analyte_by_id(layer_id)
+                    debug("Аналит (TA)")
                     if data:
                         st.session_state['analyte_ta_id'] = data['TA_ID']
+                        debug(data['TA_ID'])
                         st.session_state['analyte_ta_name'] = data['TA_Name'] or ''
                         st.session_state['analyte_ph_min'] = data['PH_Min']
                         st.session_state['analyte_ph_max'] = data['PH_Max']
@@ -2137,6 +2213,9 @@ class BiosensorGUI:
         # ✅ Регистрируем закрытие БД при завершении
         # atexit.register(self.db_manager.close)
         debug("Приложение запущено")
+        if 'analyte_ta_id' in st.session_state:
+            ta_id = st.session_state['analyte_ta_id']
+            print("Значение переменной:", ta_id)
 
         # ✅ Инициализируем session_state с помощью setdefault()
         # st.session_state.setdefault('active_section', 'data_entry')
@@ -2171,6 +2250,10 @@ class BiosensorGUI:
             # По умолчанию показываем ввод паспортов
             st.header("🔬 Ввод паспортов")
             self.create_data_entry_tab()
+
+        if 'analyte_ta_id' in st.session_state:
+            ta_id = st.session_state['analyte_ta_id']
+            print("Значение переменной:", ta_id)
             
         # ✅ Создаём вкладки НАПРЯМУЮ (без рекурсии)
         '''tabs = st.tabs([
