@@ -1,7 +1,4 @@
-﻿#import tkinter as tk
-#from tkinter import ttk, messagebox, filedialog
-import sqlite3
-# import re
+﻿import sqlite3
 from typing import Dict, Any, List
 import json
 from functools import lru_cache
@@ -584,10 +581,6 @@ class BiosensorGUI:
     """GUI-приложение для управления паспортами мемристивных биосенсоров."""
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        #self.root = tk.Tk()
-        #self.root.title("Паспорта мемристивных биосенсоров v2.0")
-        #self.root.geometry("1200x800")
-        #self.root.configure(bg='#f0f0f0')
 
         st.set_page_config(page_title="Паспорта мемристивных биосенсоров v2.0", layout="wide")
         st.title("Паспорта мемристивных биосенсоров v2.0")
@@ -678,13 +671,6 @@ class BiosensorGUI:
 
         # Создание интерфейса
         self.sections = {}
-        #self.create_menu()
-        # self.create_notebook()
-        #self.create_data_entry_tab()
-        #self.create_database_tab()
-        #self.create_analysis_tab()
-
-        #self.create_menu()
 
     def get_default_config(self):
         """Возвращает конфигурацию по умолчанию для полей."""
@@ -746,7 +732,7 @@ class BiosensorGUI:
     
     # streamlit
     def create_menu(self):
-        # """Создание меню приложения для Streamlit."""
+        """Создание меню приложения для Streamlit."""
         debug("create_menu")
     
         # Создание боковой панели с меню
@@ -764,7 +750,7 @@ class BiosensorGUI:
     
         st.sidebar.divider()
 
-            # Раздел "Навигация"
+        # Раздел "Навигация"
         st.sidebar.subheader("🔀 Навигация")
         nav_col1, nav_col2, nav_col3 = st.sidebar.columns(3)
         
@@ -1411,13 +1397,6 @@ class BiosensorGUI:
                 'HL': st.session_state.get('bio_durability'),
                 'PC': st.session_state.get('bio_power_consumption')
             }
-            
-            '''if bio_data['BRE_ID']:
-                if self.db_manager.insert_bio_recognition_layer(bio_data):
-                    st.success("✅ Биораспознающий слой сохранён")
-                    self.logger.info(f"Биослой {bio_data['BRE_ID']} сохранён")
-            '''
-
 
             if not bio_data["BRE_ID"]:
                 st.error("❌ Введите BRE_ID")
@@ -1475,12 +1454,6 @@ class BiosensorGUI:
                 'HL': st.session_state.get('immob_durability'),
                 'PC': st.session_state.get('immob_power_consumption')
             }
-            
-            '''if immob_data['IM_ID']:
-                if self.db_manager.insert_immobilization_layer(immob_data):
-                    st.success("✅ Иммобилизационный слой сохранён")
-                    self.logger.info(f"Иммобилизационный слой {immob_data['IM_ID']} сохранён")
-            '''
 
             # Обработка результата в GUI слое
             if immob_data['IM_ID']:
@@ -1533,13 +1506,6 @@ class BiosensorGUI:
                 'HL': st.session_state.get('mem_durability'),
                 'PC': st.session_state.get('mem_power_consumption')
             }
-            
-            '''
-            if mem_data['MEM_ID']:
-                if self.db_manager.insert_memristive_layer(mem_data):
-                    st.success("✅ Мемристивный слой сохранён")
-                    self.logger.info(f"Мемристивный слой {mem_data['MEM_ID']} сохранён")
-            '''
 
             if not mem_data['MEM_ID']:
                 st.error("❌ ID мемристора не может быть пустым")
@@ -1986,13 +1952,12 @@ class BiosensorGUI:
         if sensor_combinations:
             for combo in sensor_combinations:
                 combo_info = f"""
-                    Комбинация: {combo.get('Combo_ID', 'N/A')}
-                    ├─ Аналит: {combo.get('TA_ID', 'N/A')}
-                    ├─ Биослой: {combo.get('BRE_ID', 'N/A')}
-                    ├─ Иммобилизация: {combo.get('IM_ID', 'N/A')}
-                    ├─ Мемристивный слой: {combo.get('MEM_ID', 'N/A')}
-                    └─ Оценка: {combo.get('Score', 'N/A')}
-                    """
+Комбинация: {combo.get('Combo_ID', 'N/A')}
+├─ Аналит: {combo.get('TA_ID', 'N/A')}
+├─ Биослой: {combo.get('BRE_ID', 'N/A')}
+├─ Иммобилизация: {combo.get('IM_ID', 'N/A')}
+├─ Мемристивный слой: {combo.get('MEM_ID', 'N/A')}
+└─ Оценка: {combo.get('Score', 'N/A')}"""
                 st.session_state.analysis_result += combo_info + "\n"
             st.success("✅ Анализ завершен!")
         else:
@@ -2066,16 +2031,15 @@ class BiosensorGUI:
             
             stats = f"""=== СТАТИСТИКА БАЗЫ ДАННЫХ ===
 
-                Количество записей по типам:
+Количество записей по типам:
 
-                📋 Аналиты: {analytes_count}
-                🔴 Биораспознающие слои: {bio_count}
-                🟡 Иммобилизационные слои: {immob_count}
-                🟣 Мемристивные слои: {mem_count}
-                ⚙️  Комбинации сенсоров: {combo_count}
+📋 Аналиты: {analytes_count}
+🔴 Биораспознающие слои: {bio_count}
+🟡 Иммобилизационные слои: {immob_count}
+🟣 Мемристивные слои: {mem_count}
+⚙️  Комбинации сенсоров: {combo_count}
 
-                ВСЕГО ЭЛЕМЕНТОВ: {analytes_count + bio_count + immob_count + mem_count + combo_count}
-                """
+ВСЕГО ЭЛЕМЕНТОВ: {analytes_count + bio_count + immob_count + mem_count + combo_count}"""
             st.session_state.analysis_result = stats
             st.success("✅ Статистика обновлена!")
             
@@ -2157,11 +2121,6 @@ class BiosensorGUI:
             except Exception as e:
                 self.logger.exception("Ошибка экспорта данных")
                 st.error(f"Ошибка экспорта: {e}")
-
-    '''def about(self):
-        """Отображение информации о программе."""
-        messagebox.showinfo("О программе", "Паспорта мемристивных биосенсоров v2.0\n\n© 2025")
-    '''
 
     # streamlit version
     def about(self):
