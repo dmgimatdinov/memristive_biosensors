@@ -1,0 +1,4 @@
+.vscode/launch.json
+.vscode/settings.json
+__pycache__/DB_6.cpython-311.pyc
+biosensor.log
