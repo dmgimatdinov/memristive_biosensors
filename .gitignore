@@ -2,3 +2,10 @@
 .vscode/settings.json
 __pycache__/DB_6.cpython-311.pyc
 biosensor.log
+.idea/memristiveBiosensors.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+.idea/inspectionProfiles/profiles_settings.xml
+tests/__pycache__/TestSection.cpython-311.pyc
+.idea/.gitignore
