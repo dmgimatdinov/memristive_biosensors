@@ -232,7 +232,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--words", "-w", nargs="+", required=False, help="Target words (space separated) or comma-separated if quoted")
     parser.add_argument("--from-file", "-f", help="Path to a file containing target words, one per line")
     parser.add_argument("--output", "-o", help="Path to save results as CSV file")
-        parser.add_argument("--xlsx", help="Path to save results as XLSX file")
+    parser.add_argument("--xlsx", help="Path to save results as XLSX file")
     args = parser.parse_args(argv)
 
     # build target words list
