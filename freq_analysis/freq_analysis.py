@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import sys
+import csv
 import argparse
 from pathlib import Path
 from typing import List, Dict, Any
@@ -110,7 +111,8 @@ def print_results(results: List[Dict[str, Any]], target_words: List[str]) -> Non
     print("filename\tsearched_words\tcounts\ttotal")
     words_label = ",".join(target_words)
     for r in results:
-        fname = r.get("file")
+        full_path = r.get("file")
+        fname = Path(full_path).name  # extract basename
         if r.get("error"):
             print(f"{fname}\t{words_label}\tERROR: {r.get('error')}\t0")
             continue
@@ -118,6 +120,44 @@ def print_results(results: List[Dict[str, Any]], target_words: List[str]) -> Non
         counts_str = ", ".join([f"{w}:{counts.get(w,0)}" for w in target_words])
         total = r.get("total", 0)
         print(f"{fname}\t{words_label}\t{counts_str}\t{total}")
+
+
+def save_results_to_csv(results: List[Dict[str, Any]], target_words: List[str], output_path: str) -> None:
+    """Save analysis results to CSV file.
+    
+    CSV columns: filename, searched_words, <word1>, <word2>, ..., total
+    """
+    try:
+        with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['filename', 'searched_words'] + target_words + ['total']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for r in results:
+                full_path = r.get("file")
+                fname = Path(full_path).name
+                words_label = ",".join(target_words)
+                
+                row = {
+                    'filename': fname,
+                    'searched_words': words_label,
+                }
+                
+                if r.get("error"):
+                    row['total'] = 0
+                    for w in target_words:
+                        row[w] = 0
+                else:
+                    counts = r.get("counts", {})
+                    for w in target_words:
+                        row[w] = counts.get(w, 0)
+                    row['total'] = r.get("total", 0)
+                
+                writer.writerow(row)
+        
+        print(f"Results saved to {output_path}", file=sys.stderr)
+    except Exception as e:
+        print(f"Error saving to CSV: {e}", file=sys.stderr)
 
 
 def gather_paths(patterns: List[str]) -> List[Path]:
@@ -150,6 +190,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--paths", "-p", nargs="+", required=True, help="Files, globs or directories to analyze")
     parser.add_argument("--words", "-w", nargs="+", required=True, help="Target words (space separated) or comma-separated if quoted")
     parser.add_argument("--from-file", "-f", help="Path to a file containing target words, one per line")
+    parser.add_argument("--output", "-o", help="Path to save results as CSV file")
     args = parser.parse_args(argv)
 
     # build target words list
@@ -175,6 +216,11 @@ def main(argv: List[str] | None = None) -> int:
 
     results = analyze_files(paths, target_words)
     print_results(results, target_words)
+    
+    # Save to CSV if requested
+    if args.output:
+        save_results_to_csv(results, target_words, args.output)
+    
     return 0
 
 
