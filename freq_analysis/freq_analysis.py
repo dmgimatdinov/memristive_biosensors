@@ -125,22 +125,20 @@ def print_results(results: List[Dict[str, Any]], target_words: List[str]) -> Non
 def save_results_to_csv(results: List[Dict[str, Any]], target_words: List[str], output_path: str) -> None:
     """Save analysis results to CSV file.
     
-    CSV columns: filename, searched_words, <word1>, <word2>, ..., total
+    CSV columns: filename, <word1>, <word2>, ..., total
     """
     try:
         with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = ['filename', 'searched_words'] + target_words + ['total']
+            fieldnames = ['filename'] + target_words + ['total']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             
             for r in results:
                 full_path = r.get("file")
                 fname = Path(full_path).name
-                words_label = ",".join(target_words)
                 
                 row = {
                     'filename': fname,
-                    'searched_words': words_label,
                 }
                 
                 if r.get("error"):
