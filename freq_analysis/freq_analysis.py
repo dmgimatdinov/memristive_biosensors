@@ -188,7 +188,7 @@ def gather_paths(patterns: List[str]) -> List[Path]:
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Frequency word analysis for PDF/DOCX/TXT files")
     parser.add_argument("--paths", "-p", nargs="+", required=True, help="Files, globs or directories to analyze")
-    parser.add_argument("--words", "-w", nargs="+", required=True, help="Target words (space separated) or comma-separated if quoted")
+    parser.add_argument("--words", "-w", nargs="+", required=False, help="Target words (space separated) or comma-separated if quoted")
     parser.add_argument("--from-file", "-f", help="Path to a file containing target words, one per line")
     parser.add_argument("--output", "-o", help="Path to save results as CSV file")
     args = parser.parse_args(argv)
@@ -202,12 +202,13 @@ def main(argv: List[str] | None = None) -> int:
                 ln = ln.strip()
                 if ln:
                     target_words.append(ln)
-    for w in args.words:
-        # allow comma-separated lists in single arg
-        for sub in w.split(','):
-            sub = sub.strip()
-            if sub:
-                target_words.append(sub)
+    if args.words:
+        for w in args.words:
+            # allow comma-separated lists in single arg
+            for sub in w.split(','):
+                sub = sub.strip()
+                if sub:
+                    target_words.append(sub)
 
     paths = gather_paths(args.paths)
     if not paths:
