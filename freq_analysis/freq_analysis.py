@@ -15,6 +15,11 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 try:
+    from openpyxl import Workbook
+except Exception:
+    Workbook = None
+
+try:
     from PyPDF2 import PdfReader
 except Exception:
     PdfReader = None
@@ -158,6 +163,44 @@ def save_results_to_csv(results: List[Dict[str, Any]], target_words: List[str], 
         print(f"Error saving to CSV: {e}", file=sys.stderr)
 
 
+def save_results_to_xlsx(results: List[Dict[str, Any]], target_words: List[str], output_path: str) -> None:
+    """Save analysis results to XLSX file.
+    
+    XLSX columns: filename, <word1>, <word2>, ..., total
+    """
+    if Workbook is None:
+        print("openpyxl is not installed. Install with: pip install openpyxl", file=sys.stderr)
+        return
+    
+    try:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Results"
+        
+        # Write header
+        header = ['filename'] + target_words + ['total']
+        ws.append(header)
+        
+        # Write data rows
+        for r in results:
+            full_path = r.get("file")
+            fname = Path(full_path).name
+            
+            if r.get("error"):
+                row_data = [fname] + [0] * len(target_words) + [0]
+            else:
+                counts = r.get("counts", {})
+                counts_list = [counts.get(w, 0) for w in target_words]
+                row_data = [fname] + counts_list + [r.get("total", 0)]
+            
+            ws.append(row_data)
+        
+        wb.save(output_path)
+        print(f"Results saved to {output_path}", file=sys.stderr)
+    except Exception as e:
+        print(f"Error saving to XLSX: {e}", file=sys.stderr)
+
+
 def gather_paths(patterns: List[str]) -> List[Path]:
     paths: List[Path] = []
     for pat in patterns:
@@ -189,6 +232,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--words", "-w", nargs="+", required=False, help="Target words (space separated) or comma-separated if quoted")
     parser.add_argument("--from-file", "-f", help="Path to a file containing target words, one per line")
     parser.add_argument("--output", "-o", help="Path to save results as CSV file")
+        parser.add_argument("--xlsx", help="Path to save results as XLSX file")
     args = parser.parse_args(argv)
 
     # build target words list
@@ -219,6 +263,10 @@ def main(argv: List[str] | None = None) -> int:
     # Save to CSV if requested
     if args.output:
         save_results_to_csv(results, target_words, args.output)
+        # Save to XLSX if requested
+        if args.xlsx:
+            save_results_to_xlsx(results, target_words, args.xlsx)
+    
     
     return 0
 
