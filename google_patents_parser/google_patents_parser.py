@@ -39,6 +39,8 @@ try:
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
     from webdriver_manager.chrome import ChromeDriverManager
+    from selenium.webdriver.chrome.service import Service
+    
 except Exception:
     webdriver = None
     Options = None
@@ -69,8 +71,12 @@ def fetch_with_selenium(url: str, timeout: int = 20, wait: float = 2.0) -> Optio
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
+        
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
 
-        driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
+        # driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
+        
         driver.set_page_load_timeout(timeout)
         driver.get(url)
         time.sleep(wait)
