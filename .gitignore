@@ -11,3 +11,4 @@ tests/__pycache__/TestSection.cpython-311.pyc
 .idea/.gitignore
 freq_analysis/__pycache__/freq_analysis.cpython-311.pyc
 freq_analysis/commands-templates
+google_patents_parser/commands-templates
