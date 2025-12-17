@@ -17,12 +17,15 @@ import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-try:
+import requests
+from bs4 import BeautifulSoup
+    
+"""try:
     import requests
     from bs4 import BeautifulSoup
 except ImportError:
     requests = None
-    BeautifulSoup = None
+    BeautifulSoup = None"""
 
 try:
     from reportlab.lib.pagesizes import letter, A4
