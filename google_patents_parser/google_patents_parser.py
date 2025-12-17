@@ -123,52 +123,243 @@ def fetch_with_selenium(url: str, timeout: int = 20, wait: float = 2.0) -> Optio
     Используется для страниц, требующих рендеринга JavaScript:
     - Google Patents (иногда использует AJAX)
     - Сложные UI компоненты
+    
+    ДИАГНОСТИКА ОШИБОК:
+    - "session not created: Chrome instance exited" → несовместимость версий Chrome/ChromeDriver
+    - Retry с альтернативными опциями запуска
+    - Подробное логирование версий для отладки
     """
     if webdriver is None or ChromeDriverManager is None:
         logger.error("selenium/webdriver-manager не установлены. Установите: pip install selenium webdriver-manager")
         raise RuntimeError("selenium and webdriver-manager are required for --use-selenium. Install with: pip install selenium webdriver-manager")
     
     driver = None
+    
+    # Попытаемся несколько раз с разными опциями
+    chromium_options_variants = [
+        # Вариант 1: современный headless режим (Selenium 4.14+)
+        {
+            'name': 'headless=new (modern)',
+            'options': {
+                '--headless=new': None,
+                '--no-sandbox': None,
+                '--disable-dev-shm-usage': None,
+                '--disable-gpu': None,
+                '--disable-blink-features=AutomationControlled': None,
+            },
+            'experimental': {'excludeSwitches': ['enable-automation']},
+            'prefs': {}
+        },
+        # Вариант 2: классический headless режим
+        {
+            'name': 'headless (classic)',
+            'options': {
+                '--headless': None,  # классический режим
+                '--no-sandbox': None,
+                '--disable-dev-shm-usage': None,
+                '--disable-gpu': None,
+                '--disable-blink-features=AutomationControlled': None,
+                '--disable-web-resources': None,
+            },
+            'experimental': {'excludeSwitches': ['enable-automation']},
+            'prefs': {}
+        },
+        # Вариант 3: минимальный набор опций (для критических случаев)
+        {
+            'name': 'minimal options',
+            'options': {
+                '--headless': None,
+                '--no-sandbox': None,
+                '--disable-dev-shm-usage': None,
+            },
+            'experimental': {},
+            'prefs': {}
+        },
+    ]
+    
+    for variant_idx, variant in enumerate(chromium_options_variants, 1):
+        try:
+            logger.info(f"Попытка {variant_idx}: инициализация Chrome с опциями '{variant['name']}'")
+            
+            # Получаем путь к ChromeDriver и выводим версии
+            try:
+                chrome_driver_path = ChromeDriverManager().install()
+                logger.debug(f"ChromeDriver путь: {chrome_driver_path}")
+            except Exception as e:
+                logger.error(f"Ошибка при загрузке ChromeDriver: {e}")
+                if variant_idx < len(chromium_options_variants):
+                    logger.info(f"Пробуем следующий вариант опций...")
+                    continue
+                else:
+                    raise
+            
+            # Создаём опции
+            chrome_options = Options()
+            
+            # Добавляем основные аргументы
+            for arg, value in variant['options'].items():
+                if value is None:
+                    chrome_options.add_argument(arg)
+                else:
+                    chrome_options.add_argument(f"{arg}={value}")
+            
+            # Добавляем экспериментальные опции
+            if variant['experimental']:
+                for key, val in variant['experimental'].items():
+                    chrome_options.add_experimental_option(key, val)
+            
+            # Добавляем preferences
+            if variant['prefs']:
+                chrome_options.add_experimental_option("prefs", variant['prefs'])
+            
+            logger.debug(f"Опции Chrome настроены: {len(variant['options'])} аргументов")
+            
+            # Создаём Service
+            service = Service(chrome_driver_path)
+            logger.debug(f"Service создан для {chrome_driver_path}")
+            
+            # Создаём WebDriver (это обычно самое проблемное место)
+            logger.info(f"Создание WebDriver экземпляра...")
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            logger.info(f"✓ WebDriver успешно инициализирован с опциями '{variant['name']}'")
+            
+            # Если дошли сюда - успешно создали драйвер, выходим из цикла
+            break
+            
+        except Exception as e:
+            logger.warning(f"Ошибка при попытке {variant_idx} ({variant['name']}): {e}")
+            
+            # Очищаем драйвер если был создан
+            if driver:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
+                driver = None
+            
+            # Если это последняя попытка - выходим с ошибкой
+            if variant_idx >= len(chromium_options_variants):
+                logger.error(f"Все попытки инициализации Chrome исчерпаны. Последняя ошибка: {e}")
+                return None
+            
+            logger.info(f"Пробуем следующий вариант опций...")
+            time.sleep(0.5)  # Небольшая задержка перед следующей попыткой
+            continue
+    
+    # Если не удалось создать драйвер ни одной попыткой
+    if driver is None:
+        logger.error("Не удалось инициализировать WebDriver ни с одним набором опций")
+        return None
+    
     try:
-        chrome_options = Options()
-        chrome_options.add_argument('--headless=new')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        logger.info(f"Загрузка через Selenium: {url}")
+        logger.info(f"Загрузка URL через Selenium: {url}")
         driver.set_page_load_timeout(timeout)
         driver.get(url)
+        logger.debug(f"Страница загружена, ожидание рендеринга ({wait}с)...")
         time.sleep(wait)  # Ожидание рендеринга JavaScript
         
         html = driver.page_source
-        logger.info(f"Успешно загружено через Selenium ({len(html)} байт)")
+        logger.info(f"✓ Успешно загружено через Selenium ({len(html)} байт)")
         return html
     
     except Exception as e:
-        logger.error(f"Ошибка Selenium: {e}")
+        logger.error(f"Ошибка при загрузке URL: {e}")
         return None
+    
     finally:
+        # Безопасное закрытие драйвера
         if driver:
             try:
                 driver.quit()
-            except Exception:
-                pass
+                logger.debug("WebDriver закрыт корректно")
+            except Exception as e:
+                logger.warning(f"Ошибка при закрытии WebDriver: {e}")
 
 
 def fetch_patent_page(url: str, use_selenium: bool = False, timeout: int = 20) -> Optional[str]:
-    """Fetch Google Patents page HTML."""
+    """
+    Загрузка страницы патента с автоматическим fallback.
+    
+    1. Если use_selenium=True: пробуем Selenium, затем fallback на requests
+    2. Если use_selenium=False: используем requests напрямую
+    """
     if use_selenium:
+        logger.info("Режим: Selenium (с fallback на requests)")
         html = fetch_with_selenium(url, timeout=timeout)
         if html:
             return html
+        logger.info("Selenium не сработал, пробуем requests...")
         return fetch_with_requests(url, timeout=timeout)
+    
+    logger.info("Режим: Requests (статический контент)")
     return fetch_with_requests(url, timeout=timeout)
+
+
+def diagnose_chrome_setup() -> Dict[str, Any]:
+    """
+    Диагностика окружения Chrome/ChromeDriver.
+    Помогает выявить проблемы с совместимостью.
+    
+    Возвращает информацию о:
+    - Наличии Chrome/Chromium
+    - Версии ChromeDriver
+    - Наличии selenium и webdriver-manager
+    - Системных параметрах
+    """
+    import platform
+    import shutil
+    
+    diagnostics = {
+        'python_version': platform.python_version(),
+        'platform': platform.system(),
+        'platform_release': platform.release(),
+        'selenium_installed': webdriver is not None,
+        'webdriver_manager_installed': ChromeDriverManager is not None,
+    }
+    
+    # Проверяем наличие Chrome
+    chrome_paths = {
+        'Windows': [
+            r'C:\Program Files\Google\Chrome\Application\chrome.exe',
+            r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe',
+        ],
+        'Linux': [
+            '/usr/bin/google-chrome',
+            '/usr/bin/google-chrome-stable',
+            '/usr/bin/chromium',
+            '/usr/bin/chromium-browser',
+        ],
+        'Darwin': [  # macOS
+            '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+            '/Applications/Chromium.app/Contents/MacOS/Chromium',
+        ]
+    }
+    
+    system = platform.system()
+    chrome_found = None
+    for path in chrome_paths.get(system, []):
+        if shutil.which(path.split('/')[0] if '/' in path else path.split('\\')[-1]):
+            chrome_found = path
+            break
+    
+    diagnostics['chrome_found'] = chrome_found
+    
+    # Пробуем получить версию ChromeDriver
+    if ChromeDriverManager is not None:
+        try:
+            driver_path = ChromeDriverManager().install()
+            diagnostics['chromedriver_path'] = driver_path
+            diagnostics['chromedriver_installed'] = True
+        except Exception as e:
+            diagnostics['chromedriver_installed'] = False
+            diagnostics['chromedriver_error'] = str(e)
+    
+    logger.info("=== Диагностика Chrome/ChromeDriver ===")
+    for key, val in diagnostics.items():
+        logger.info(f"  {key}: {val}")
+    logger.info("=====================================")
+    
+    return diagnostics
 
 
 def extract_full_text(soup: BeautifulSoup) -> str:
@@ -613,6 +804,7 @@ def main(argv: List[str] | None = None) -> int:
   python google_patents_parser.py --url "https://patents.google.com/patent/US1234567A"
   python google_patents_parser.py --links-file urls.txt --output-dir ./pdfs --use-selenium
   python google_patents_parser.py --url "https://patents.google.com/patent/EP1234567A1" --output patent.pdf
+  python google_patents_parser.py --diagnose  # Проверка окружения Chrome/Selenium
         """
     )
     parser.add_argument("--url", "-u", help="URL патента (Google Patents, USPTO, EPO)")
@@ -622,6 +814,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--use-selenium", action='store_true', help="Использовать Selenium (для JS контента)")
     parser.add_argument("--timeout", type=int, default=20, help="Таймаут загрузки в секундах (по умолчанию: 20)")
     parser.add_argument("--verbose", "-v", action='store_true', help="Подробный лог (DEBUG уровень)")
+    parser.add_argument("--diagnose", action='store_true', help="Диагностика окружения Chrome/Selenium и выход")
     
     args = parser.parse_args(argv)
     
@@ -630,6 +823,22 @@ def main(argv: List[str] | None = None) -> int:
         logger.setLevel(logging.DEBUG)
     
     logger.info("=== Google Patents Parser ===")
+    
+    # Диагностика если запрошена
+    if args.diagnose:
+        diagnostics = diagnose_chrome_setup()
+        if not diagnostics['selenium_installed']:
+            logger.error("❌ selenium не установлен. Установите: pip install selenium")
+        if not diagnostics['webdriver_manager_installed']:
+            logger.error("❌ webdriver-manager не установлен. Установите: pip install webdriver-manager")
+        if not diagnostics['chrome_found']:
+            logger.warning("⚠️ Chrome не найден в стандартных местах (может быть установлен в другом месте)")
+        if diagnostics.get('chromedriver_installed'):
+            logger.info(f"✅ ChromeDriver готов к использованию")
+        else:
+            logger.error(f"❌ Ошибка ChromeDriver: {diagnostics.get('chromedriver_error', 'неизвестная ошибка')}")
+        return 0
+    
     logger.info(f"Режим: {'Selenium' if args.use_selenium else 'Requests'}")
 
     out_dir = Path(args.output_dir)
