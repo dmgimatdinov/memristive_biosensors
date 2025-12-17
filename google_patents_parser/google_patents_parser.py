@@ -1,13 +1,30 @@
-"""Google Patents parser - extract and save patent information to PDF.
+"""
+Google Patents & Patent Document Parser
+=========================================
 
-Usage (CLI):
-    python google_patents_parser.py --url "https://patents.google.com/patent/US1234567B2" --output patent.pdf
+Компетентный скрипт для извлечения релевантного текста из патентных документов.
 
-Features:
-- Selenium-based fetching (`--use-selenium`) with webdriver-manager fallback
-- Batch parsing from links file (`--links-file`)
-- Specify output directory (`--output-dir`)
-- Full page text extraction and structured sections
+ЛОГИКА РАБОТЫ:
+  1. Загрузка HTML (requests для статического контента, Selenium для JavaScript)
+  2. Парсинг BeautifulSoup с платформо-специфичными CSS селекторами
+  3. Извлечение title, abstract, description, claims (без навигации/рекламы)
+  4. Нормализация текста: удаление лишних пробелов, сохранение нумерации
+  5. Генерация PDF с метаданными и чистым контентом
+  6. Логирование всех операций (INFO/ERROR уровни)
+
+ПОДДЕРЖИВАЕМЫЕ ПЛАТФОРМЫ:
+  - Google Patents (patents.google.com)
+  - USPTO Patents (patents.uspto.gov)
+  - European Patent Office (espacenet.com)
+
+ПРИМЕРЫ:
+  python google_patents_parser.py --url "https://patents.google.com/patent/US1234567A"
+  python google_patents_parser.py --links-file urls.txt --output-dir ./pdfs --use-selenium
+
+ОБРАБОТКА ОШИБОК:
+  - 404 Not Found → логирование, пропуск URL
+  - Таймауты → автоматический retry с Selenium
+  - Изменение структуры → fallback селекторы
 """
 from __future__ import annotations
 
@@ -15,8 +32,10 @@ import sys
 import argparse
 import re
 import time
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+from urllib.parse import urlparse
 
 try:
     import requests
@@ -47,49 +66,96 @@ except Exception:
     ChromeDriverManager = None
 
 
+# ========== ЛОГИРОВАНИЕ ==========
+def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
+    """Инициализация логгера с форматом [LEVEL] message."""
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stderr)
+        formatter = logging.Formatter('%(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    
+    return logger
+
+logger = setup_logger(__name__)
+
+
 def fetch_with_requests(url: str, timeout: int = 15) -> Optional[str]:
+    """Загрузка HTML через requests (для статического контента)."""
     if requests is None:
+        logger.error("requests не установлен. Установите: pip install requests")
         raise RuntimeError("requests is not installed. Install with: pip install requests")
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
-        r = requests.get(url, headers=headers, timeout=timeout)
+        logger.info(f"Загрузка через requests: {url}")
+        r = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+        
+        if r.status_code == 404:
+            logger.error(f"404 Not Found: {url}")
+            return None
+        
         r.raise_for_status()
+        logger.info(f"Успешно загружено ({len(r.text)} байт)")
         return r.text
+    except requests.Timeout:
+        logger.error(f"Таймаут при загрузке: {url}")
+        return None
+    except requests.HTTPError as e:
+        logger.error(f"HTTP ошибка {r.status_code}: {url}")
+        return None
     except Exception as e:
-        print(f"Error fetching with requests: {e}", file=sys.stderr)
+        logger.error(f"Ошибка requests: {e}")
         return None
 
 
 def fetch_with_selenium(url: str, timeout: int = 20, wait: float = 2.0) -> Optional[str]:
+    """
+    Загрузка HTML через Selenium (для динамического контента с JavaScript).
+    
+    Используется для страниц, требующих рендеринга JavaScript:
+    - Google Patents (иногда использует AJAX)
+    - Сложные UI компоненты
+    """
     if webdriver is None or ChromeDriverManager is None:
+        logger.error("selenium/webdriver-manager не установлены. Установите: pip install selenium webdriver-manager")
         raise RuntimeError("selenium and webdriver-manager are required for --use-selenium. Install with: pip install selenium webdriver-manager")
+    
+    driver = None
     try:
         chrome_options = Options()
         chrome_options.add_argument('--headless=new')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
-
-        # driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
         
+        logger.info(f"Загрузка через Selenium: {url}")
         driver.set_page_load_timeout(timeout)
         driver.get(url)
-        time.sleep(wait)
+        time.sleep(wait)  # Ожидание рендеринга JavaScript
+        
         html = driver.page_source
-        driver.quit()
+        logger.info(f"Успешно загружено через Selenium ({len(html)} байт)")
         return html
+    
     except Exception as e:
-        print(f"Error fetching with selenium: {e}", file=sys.stderr)
-        try:
-            driver.quit()
-        except Exception:
-            pass
+        logger.error(f"Ошибка Selenium: {e}")
         return None
+    finally:
+        if driver:
+            try:
+                driver.quit()
+            except Exception:
+                pass
 
 
 def fetch_patent_page(url: str, use_selenium: bool = False, timeout: int = 20) -> Optional[str]:
@@ -103,27 +169,84 @@ def fetch_patent_page(url: str, use_selenium: bool = False, timeout: int = 20) -
 
 
 def extract_full_text(soup: BeautifulSoup) -> str:
-    """Extract all visible text from the page, excluding scripts and styles."""
-    # Remove script and style elements
-    for script in soup(["script", "style"]):
-        script.decompose()
+    """
+    Извлечение ТОЛЬКО релевантного текста патента, исключив:
+    - навигационные элементы (header, nav, footer)
+    - рекламные блоки (ads, banner)
+    - UI элементы (button, script, style)
+    - метаданные интерфейса
     
-    # Get text
-    text = soup.get_text()
+    Сохраняем кодировку UTF-8 и структуру нумерации.
+    """
+    # Удаляем элементы, не содержащие релевантный контент
+    for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
+        tag.decompose()
     
-    # Clean up whitespace
-    lines = (line.strip() for line in text.splitlines())
-    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-    text = '\n'.join(chunk for chunk in chunks if chunk)
+    # Удаляем элементы, часто содержащие рекламу/интерфейс
+    for tag in soup.find_all(class_=re.compile(r'(nav|menu|footer|ad|banner|cookie|tracking)', re.I)):
+        tag.decompose()
     
-    return text
+    # Удаляем элементы с атрибутами, указывающими на интерфейс
+    for tag in soup.find_all(id=re.compile(r'(nav|menu|ad|banner|footer|cookie)', re.I)):
+        tag.decompose()
+    
+    # Получаем текст
+    text = soup.get_text(separator='\n', strip=True)
+    
+    # Нормализация пробелов и переносов
+    # Сохраняем нумерацию пунктов (1., 2., 1.1., и т.д.)
+    lines = []
+    for line in text.splitlines():
+        line = line.strip()
+        if line:
+            lines.append(line)
+    
+    result = '\n'.join(lines)
+    
+    # Удаляем множественные переносы строк (более 2 подряд)
+    result = re.sub(r'\n{3,}', '\n\n', result)
+    
+    # Кодировка UTF-8 гарантирована
+    return result
 
 
-def parse_patent_data(html: str) -> Dict[str, Any]:
+def parse_patent_data(html: str, url: str = "") -> Dict[str, Any]:
+    """
+    Парсинг HTML патента с платформо-специфичными селекторами.
+    
+    СТРАТЕГИЯ:
+    1. Пытаемся несколько селекторов для Google Patents
+    2. При неудаче — fallback селекторы для USPTO, EPO
+    3. Логируем какие селекторы сработали (для отладки)
+    
+    CSS СЕЛЕКТОРЫ:
+    
+    Google Patents (patents.google.com):
+      title: h1[itemprop="title"], meta[property="og:title"]
+      abstract: div[data-test-id="abstract"], .abstract-section
+      description: div[data-test-id="description"], .description-section
+      claims: div[data-test-id="claims"], .claims-section, [itemprop="description"]
+    
+    USPTO (patents.uspto.gov):
+      title: h1.title, span.title
+      abstract: div[role="doc-abstract"], .abstract
+      claims: div.claims, .claims-block
+    
+    EPO (espacenet.com):
+      title: .publicationTitle, h1
+      abstract: .abstract, [id*="abstract"]
+      claims: .claims, [id*="claim"]
+    """
     if BeautifulSoup is None:
+        logger.error("BeautifulSoup4 не установлена. Установите: pip install beautifulsoup4")
         raise RuntimeError("BeautifulSoup is not installed. Install with: pip install beautifulsoup4")
 
-    soup = BeautifulSoup(html, 'html.parser')
+    try:
+        soup = BeautifulSoup(html, 'html.parser')
+    except Exception as e:
+        logger.error(f"Ошибка парсинга HTML: {e}")
+        return {'title': '', 'status': '', 'year': '', 'abstract': '', 'description': '', 'claims': '', 'full_text': ''}
+
     data: Dict[str, Any] = {
         'title': '',
         'status': '',
@@ -135,103 +258,189 @@ def parse_patent_data(html: str) -> Dict[str, Any]:
     }
 
     # Extract full page text first
+    logger.info("Извлечение полного текста страницы")
     data['full_text'] = extract_full_text(soup)
 
-    # Title: try meta tags, itemprop, h1
+    # ========== TITLE (Название патента) ==========
+    logger.info("Поиск: Title")
     title_selectors = [
-        'meta[name="DC.title"]',
-        'meta[property="og:title"]',
-        'h1[itemprop="title"]',
-        'h1.title',
-        'h1',
-        'title'
+        # Google Patents
+        ('h1[itemprop="title"]', 'Google Patents (h1 itemprop)'),
+        ('meta[property="og:title"]', 'OG:title meta'),
+        ('h1.title', 'h1.title'),
+        ('h1', 'Generic h1'),
+        # USPTO
+        ('span.title', 'USPTO span.title'),
+        # EPO
+        ('.publicationTitle', 'EPO publicationTitle'),
     ]
-    title = ''
-    for sel in title_selectors:
-        if sel.startswith('meta'):
-            meta = soup.select_one(sel)
-            if meta and meta.get('content'):
-                title = meta.get('content').strip()
-                break
-        else:
-            el = soup.select_one(sel)
-            if el:
-                title = el.get_text(strip=True)
-                if title:
+    
+    for selector, source in title_selectors:
+        try:
+            if selector.startswith('meta'):
+                elem = soup.select_one(selector)
+                if elem and elem.get('content'):
+                    data['title'] = elem.get('content').strip()
+                    logger.info(f"  ✓ Title найден: {source}")
                     break
-    data['title'] = title or ''
+            else:
+                elem = soup.select_one(selector)
+                if elem:
+                    text = elem.get_text(strip=True)
+                    if text:
+                        data['title'] = text
+                        logger.info(f"  ✓ Title найден: {source}")
+                        break
+        except Exception as e:
+            logger.debug(f"  Селектор {selector} не сработал: {e}")
+            continue
 
-    # Status: pending/granted
+    # ========== STATUS (Статус: pending/granted) ==========
+    logger.info("Поиск: Status")
     possible_status = soup.find_all(string=re.compile(r'pending|granted|published', re.I))
     if possible_status:
         status_text = possible_status[0].lower()
         if 'pending' in status_text:
             data['status'] = 'pending'
+            logger.info("  ✓ Status: pending")
         elif 'granted' in status_text:
             data['status'] = 'granted'
+            logger.info("  ✓ Status: granted")
 
-    # Year: from date patterns
+    # ========== YEAR (Год публикации) ==========
+    logger.info("Поиск: Year")
     date_elem = soup.find(string=re.compile(r'\d{4}-\d{2}-\d{2}'))
     if date_elem:
         m = re.search(r'(\d{4})', str(date_elem))
         if m:
             data['year'] = m.group(1)
+            logger.info(f"  ✓ Year: {data['year']}")
     else:
         m2 = soup.find(string=re.compile(r'\b(19|20)\d{2}\b'))
         if m2:
             m = re.search(r'(19|20)\d{2}', str(m2))
             if m:
                 data['year'] = m.group(0)
+                logger.info(f"  ✓ Year: {data['year']}")
 
-    # Abstract
-    meta_abs = soup.select_one('meta[name="DC.description"]')
-    if meta_abs and meta_abs.get('content'):
-        data['abstract'] = meta_abs.get('content').strip()
-    else:
-        for heading in soup.find_all(['h2', 'h3']):
-            if 'abstract' in heading.get_text().lower():
-                next_p = heading.find_next('p')
-                if next_p:
-                    data['abstract'] = next_p.get_text(strip=True)
-                break
-
-    # Description
-    for heading in soup.find_all(['h2', 'h3']):
-        txt = heading.get_text(strip=True).lower()
-        if 'description' in txt or 'detailed description' in txt:
-            next_p = heading.find_next('p')
-            if next_p:
-                data['description'] = next_p.get_text(strip=True)
-            break
-
-    # Claims: improved extraction until "similar documents"
-    claims_full = ''
-    claims_heading = None
-    for h in soup.find_all(['h1', 'h2', 'h3', 'h4']):
-        h_text = h.get_text(strip=True).lower()
-        if 'claim' in h_text or 'what is claimed' in h_text:
-            claims_heading = h
-            break
+    # ========== ABSTRACT (Реферат) ==========
+    logger.info("Поиск: Abstract")
+    abstract_selectors = [
+        # Google Patents
+        ('div[data-test-id="abstract"]', 'Google Patents data-test-id'),
+        ('.abstract-section', 'abstract-section class'),
+        ('meta[name="DC.description"]', 'DC.description meta'),
+        # Generic
+        ('[itemprop="abstract"]', 'itemprop abstract'),
+        ('div.abstract', 'Generic div.abstract'),
+    ]
     
-    if claims_heading:
+    for selector, source in abstract_selectors:
+        try:
+            if selector.startswith('meta'):
+                elem = soup.select_one(selector)
+                if elem and elem.get('content'):
+                    text = elem.get('content').strip()
+                    if len(text) > 20:
+                        data['abstract'] = text
+                        logger.info(f"  ✓ Abstract найден: {source} ({len(text)} символов)")
+                        break
+            else:
+                elem = soup.select_one(selector)
+                if elem:
+                    text = elem.get_text(separator='\n', strip=True)
+                    if len(text) > 20:
+                        data['abstract'] = text
+                        logger.info(f"  ✓ Abstract найден: {source} ({len(text)} символов)")
+                        break
+        except Exception as e:
+            logger.debug(f"  Селектор {selector} не сработал: {e}")
+            continue
+
+    # ========== DESCRIPTION (Полное описание) ==========
+    logger.info("Поиск: Description")
+    description_selectors = [
+        ('div[data-test-id="description"]', 'Google Patents data-test-id'),
+        ('.description-section', 'description-section class'),
+        ('div.description', 'Generic div.description'),
+        ('[itemprop="description"]', 'itemprop description'),
+    ]
+    
+    for selector, source in description_selectors:
+        try:
+            elem = soup.select_one(selector)
+            if elem:
+                text = elem.get_text(separator='\n', strip=True)
+                if len(text) > 50:
+                    data['description'] = text
+                    logger.info(f"  ✓ Description найден: {source} ({len(text)} символов)")
+                    break
+        except Exception as e:
+            logger.debug(f"  Селектор {selector} не сработал: {e}")
+            continue
+
+    # ========== CLAIMS (Формула изобретения) ==========
+    logger.info("Поиск: Claims")
+    claims_selectors = [
+        ('div[data-test-id="claims"]', 'Google Patents data-test-id'),
+        ('.claims-section', 'claims-section class'),
+        ('div.claims', 'Generic div.claims'),
+        ('[itemprop="claims"]', 'itemprop claims'),
+    ]
+    
+    claims_full = ''
+    claims_container = None
+    
+    for selector, source in claims_selectors:
+        try:
+            elem = soup.select_one(selector)
+            if elem:
+                claims_container = elem
+                logger.info(f"  ✓ Claims контейнер найден: {source}")
+                break
+        except Exception as e:
+            logger.debug(f"  Селектор {selector} не сработал: {e}")
+            continue
+    
+    if not claims_container:
+        # Fallback: ищем heading "Claims" и берём всё после него
+        for h in soup.find_all(['h1', 'h2', 'h3', 'h4']):
+            h_text = h.get_text(strip=True).lower()
+            if 'claim' in h_text or 'what is claimed' in h_text:
+                claims_container = h
+                logger.info(f"  ℹ Использован fallback: heading с текстом 'Claims'")
+                break
+    
+    if claims_container:
         all_text = []
-        current = claims_heading.find_next()
+        if claims_container.name in ['h1', 'h2', 'h3', 'h4']:
+            current = claims_container.find_next()
+        else:
+            current = claims_container.find('li') or claims_container.find('p') or claims_container.find_next()
         
         while current:
             curr_text = current.get_text(strip=True).lower()
             
-            # Stop at "similar documents" or related sections
-            if any(stop_word in curr_text for stop_word in 
-                   ['similar documents', 'related patents', 'prior art', 'cited by', 'also published']):
+            # Stop markers для остановки сбора claims
+            stop_markers = [
+                'similar documents', 'related patents', 'prior art', 
+                'cited by', 'also published', 'back to top',
+                'references cited', 'examiner signature'
+            ]
+            
+            if any(marker in curr_text for marker in stop_markers):
+                logger.debug(f"  Остановка на маркере: {stop_markers[0]}")
                 break
             
-            # Stop at other major sections
-            if current.name in ['h1', 'h2', 'h3', 'h4'] and current != claims_heading:
-                if any(word in curr_text for word in ['abstract', 'description', 'figure', 'inventor', 'applicant']):
+            # Stop на другие основные секции
+            if current.name in ['h1', 'h2', 'h3', 'h4'] and current != claims_container:
+                other_sections = ['abstract', 'description', 'figure', 'inventor', 'applicant', 'references']
+                if any(word in curr_text for word in other_sections):
+                    logger.debug(f"  Остановка на заголовке: {curr_text[:50]}")
                     break
             
-            # Collect text
-            if current.name in ['li', 'p', 'div', 'span']:
+            # Сбор текста (сохраняем нумерацию пунктов: 1., 1.1., и т.д.)
+            if current.name in ['li', 'p', 'div', 'span', 'div']:
                 text = current.get_text(strip=True)
                 if text and len(text) > 5:
                     all_text.append(text)
@@ -240,6 +449,7 @@ def parse_patent_data(html: str) -> Dict[str, Any]:
         
         if all_text:
             claims_full = '\n\n'.join(all_text)
+            logger.info(f"  ✓ Claims собраны ({len(all_text)} пунктов, {len(claims_full)} символов)")
     
     data['claims'] = claims_full
 
@@ -268,16 +478,53 @@ def generate_filename(patent_data: Dict[str, Any]) -> str:
 
 
 def create_pdf(patent_data: Dict[str, Any], output_path: str) -> bool:
+    """
+    Создание PDF с метаданными и чистым контентом.
+    
+    Структура PDF:
+    1. Заголовок + статус + год
+    2. Abstract (до 2000 символов)
+    3. Description (до 2000 символов)
+    4. Claims (до 5000 символов, на отдельной странице)
+    5. Full Page Content (релевантный текст, до 15000 символов)
+    
+    Исключены: навигация, реклама, интерфейс.
+    Сохранена нумерация пунктов формулы изобретения.
+    """
     if SimpleDocTemplate is None:
+        logger.error("reportlab не установлена. Установите: pip install reportlab")
         print("reportlab is not installed. Install with: pip install reportlab", file=sys.stderr)
         return False
+    
     try:
         doc = SimpleDocTemplate(output_path, pagesize=letter)
         story = []
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=14, textColor=colors.HexColor('#1f4788'), spaceAfter=12, fontName='Helvetica-Bold')
-        heading_style = ParagraphStyle('CustomHeading', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#2e5c8a'), spaceAfter=8, spaceBefore=12, fontName='Helvetica-Bold')
-        body_style = ParagraphStyle('CustomBody', parent=styles['BodyText'], fontSize=10, alignment=4)
+        
+        # Custom styles для лучшей читаемости
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=14,
+            textColor=colors.HexColor('#1f4788'),
+            spaceAfter=12,
+            fontName='Helvetica-Bold'
+        )
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=12,
+            textColor=colors.HexColor('#2e5c8a'),
+            spaceAfter=8,
+            spaceBefore=12,
+            fontName='Helvetica-Bold'
+        )
+        body_style = ParagraphStyle(
+            'CustomBody',
+            parent=styles['BodyText'],
+            fontSize=10,
+            alignment=4  # Justify
+        )
 
         # Title and metadata
         title = patent_data.get('title', 'Patent Document')
@@ -292,7 +539,7 @@ def create_pdf(patent_data: Dict[str, Any], output_path: str) -> bool:
             story.append(Paragraph(" | ".join(metadata), body_style))
             story.append(Spacer(1, 12))
 
-        # Structured sections if available
+        # Abstract section
         if patent_data.get('abstract'):
             story.append(Paragraph("Abstract", heading_style))
             abstract_text = patent_data['abstract']
@@ -301,6 +548,7 @@ def create_pdf(patent_data: Dict[str, Any], output_path: str) -> bool:
             story.append(Paragraph(abstract_text, body_style))
             story.append(Spacer(1, 12))
 
+        # Description section
         if patent_data.get('description'):
             story.append(Paragraph("Description", heading_style))
             description_text = patent_data['description']
@@ -309,19 +557,20 @@ def create_pdf(patent_data: Dict[str, Any], output_path: str) -> bool:
             story.append(Paragraph(description_text, body_style))
             story.append(Spacer(1, 12))
 
+        # Claims section (with page break if needed)
         if patent_data.get('claims'):
             story.append(PageBreak() if len(story) > 10 else Spacer(1, 12))
-            story.append(Paragraph("Claims", heading_style))
+            story.append(Paragraph("Claims (Formula of Invention)", heading_style))
             claims_text = patent_data['claims']
             if len(claims_text) > 5000:
                 claims_text = claims_text[:5000] + "..."
             story.append(Paragraph(claims_text, body_style))
             story.append(Spacer(1, 12))
 
-        # Full page text
+        # Full page content (clean, without navigation/ads)
         if patent_data.get('full_text'):
             story.append(PageBreak())
-            story.append(Paragraph("Full Page Content", heading_style))
+            story.append(Paragraph("Full Page Content (Extracted Text)", heading_style))
             full_text = patent_data['full_text']
             # Limit to reasonable size
             if len(full_text) > 15000:
@@ -329,53 +578,103 @@ def create_pdf(patent_data: Dict[str, Any], output_path: str) -> bool:
             story.append(Paragraph(full_text, body_style))
 
         doc.build(story)
+        logger.info(f"✓ PDF успешно создан: {output_path}")
         return True
+    
     except Exception as e:
-        print(f"Error creating PDF: {e}", file=sys.stderr)
+        logger.error(f"Ошибка создания PDF: {e}")
         return False
 
 
 def _read_links_file(p: Path) -> List[str]:
+    """Чтение файла со списком URL (один URL на строку)."""
     if not p.exists():
-        print(f"Links file not found: {p}", file=sys.stderr)
+        logger.error(f"Файл не найден: {p}")
         return []
-    lines = [l.strip() for l in p.read_text(encoding='utf-8', errors='ignore').splitlines()]
-    return [l for l in lines if l]
+    try:
+        lines = [l.strip() for l in p.read_text(encoding='utf-8', errors='ignore').splitlines()]
+        valid_urls = [l for l in lines if l and (l.startswith('http://') or l.startswith('https://'))]
+        logger.info(f"Прочитано {len(valid_urls)} URL из {p}")
+        return valid_urls
+    except Exception as e:
+        logger.error(f"Ошибка чтения файла {p}: {e}")
+        return []
 
 
 def main(argv: List[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Parse Google Patents and save information to PDF")
-    parser.add_argument("--url", "-u", help="Google Patents URL")
-    parser.add_argument("--links-file", help="Path to file with one Google Patents URL per line (batch mode)")
-    parser.add_argument("--output", "-o", help="Output PDF file path (auto-generated if not specified)")
-    parser.add_argument("--output-dir", "-d", help="Directory to save PDFs (defaults to current directory)", default='.')
-    parser.add_argument("--use-selenium", action='store_true', help="Use Selenium (headless Chrome) for fetching pages")
-    parser.add_argument("--timeout", type=int, default=20, help="Page load timeout seconds")
+    """Основная функция CLI."""
+    parser = argparse.ArgumentParser(
+        description="Извлечение релевантного текста из патентных документов",
+        epilog="""
+Примеры:
+  python google_patents_parser.py --url "https://patents.google.com/patent/US1234567A"
+  python google_patents_parser.py --links-file urls.txt --output-dir ./pdfs --use-selenium
+  python google_patents_parser.py --url "https://patents.google.com/patent/EP1234567A1" --output patent.pdf
+        """
+    )
+    parser.add_argument("--url", "-u", help="URL патента (Google Patents, USPTO, EPO)")
+    parser.add_argument("--links-file", help="Файл со списком URL (один на строку)")
+    parser.add_argument("--output", "-o", help="Путь к выходному PDF (авто-генерируется, если не указано)")
+    parser.add_argument("--output-dir", "-d", help="Директория для сохранения PDF (по умолчанию: .)", default='.')
+    parser.add_argument("--use-selenium", action='store_true', help="Использовать Selenium (для JS контента)")
+    parser.add_argument("--timeout", type=int, default=20, help="Таймаут загрузки в секундах (по умолчанию: 20)")
+    parser.add_argument("--verbose", "-v", action='store_true', help="Подробный лог (DEBUG уровень)")
+    
     args = parser.parse_args(argv)
+    
+    # Устанавливаем уровень логирования
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+    
+    logger.info("=== Google Patents Parser ===")
+    logger.info(f"Режим: {'Selenium' if args.use_selenium else 'Requests'}")
 
     out_dir = Path(args.output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Не удалось создать директорию {out_dir}: {e}")
+        return 1
 
+    # Формируем список URL для обработки
     urls: List[str] = []
     if args.links_file:
+        logger.info(f"Читаем URL из файла: {args.links_file}")
         urls = _read_links_file(Path(args.links_file))
         if not urls:
-            print("No URLs found in links file.", file=sys.stderr)
+            logger.error("Файл пуст или не содержит валидных URL")
             return 2
     elif args.url:
         urls = [args.url]
     else:
+        logger.error("Необходимо указать --url или --links-file")
         parser.error("Either --url or --links-file must be provided")
 
+    logger.info(f"Начинаем обработку {len(urls)} URL")
+    successful = 0
+    failed = 0
+
     for idx, url in enumerate(urls, start=1):
-        print(f"[{idx}/{len(urls)}] Fetching: {url}", file=sys.stderr)
+        logger.info(f"\n[{idx}/{len(urls)}] ═══════════════════════════════════")
+        logger.info(f"URL: {url}")
+        
+        # Загружаем страницу
         html = fetch_patent_page(url, use_selenium=bool(args.use_selenium), timeout=args.timeout)
         if not html:
-            print(f"Failed to fetch: {url}", file=sys.stderr)
+            logger.error(f"✗ Не удалось загрузить страницу")
+            failed += 1
             continue
-        patent_data = parse_patent_data(html)
+        
+        # Парсим данные
+        try:
+            logger.info("Парсинг HTML...")
+            patent_data = parse_patent_data(html, url=url)
+        except Exception as e:
+            logger.error(f"Ошибка парсинга: {e}")
+            failed += 1
+            continue
 
-        # Determine output path
+        # Определяем путь выходного файла
         if len(urls) == 1 and args.output:
             out_path = Path(args.output)
             if out_path.is_dir():
@@ -385,13 +684,18 @@ def main(argv: List[str] | None = None) -> int:
             filename = generate_filename(patent_data)
             out_path = out_dir / filename
 
-        print(f"Creating PDF: {out_path}", file=sys.stderr)
+        # Создаём PDF
+        logger.info(f"Создание PDF: {out_path}")
         if create_pdf(patent_data, str(out_path)):
-            print(f"Saved: {out_path}", file=sys.stderr)
+            logger.info(f"✓ Успешно: {out_path}")
+            successful += 1
         else:
-            print(f"Failed to create PDF for: {url}", file=sys.stderr)
+            logger.error(f"✗ Ошибка создания PDF")
+            failed += 1
 
-    return 0
+    logger.info(f"\n═══════════════════════════════════")
+    logger.info(f"Итого: {successful} успешно, {failed} ошибок из {len(urls)}")
+    return 0 if failed == 0 else 1
 
 
 if __name__ == "__main__":

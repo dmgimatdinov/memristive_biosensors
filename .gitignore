@@ -13,3 +13,4 @@ freq_analysis/__pycache__/freq_analysis.cpython-311.pyc
 freq_analysis/commands-templates
 google_patents_parser/commands-templates
 google_patents_parser/links-file
+google_patents_parser/__pycache__/google_patents_parser.cpython-311.pyc
