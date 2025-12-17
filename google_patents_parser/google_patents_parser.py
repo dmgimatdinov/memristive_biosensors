@@ -3,10 +3,11 @@
 Usage (CLI):
     python google_patents_parser.py --url "https://patents.google.com/patent/US1234567B2" --output patent.pdf
 
-Features added:
+Features:
 - Selenium-based fetching (`--use-selenium`) with webdriver-manager fallback
 - Batch parsing from links file (`--links-file`)
 - Specify output directory (`--output-dir`)
+- Full page text extraction and structured sections
 """
 from __future__ import annotations
 
@@ -17,15 +18,12 @@ import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-import requests
-from bs4 import BeautifulSoup
-    
-"""try:
+try:
     import requests
     from bs4 import BeautifulSoup
 except ImportError:
     requests = None
-    BeautifulSoup = None"""
+    BeautifulSoup = None
 
 try:
     from reportlab.lib.pagesizes import letter, A4
@@ -75,7 +73,6 @@ def fetch_with_selenium(url: str, timeout: int = 20, wait: float = 2.0) -> Optio
         driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
         driver.set_page_load_timeout(timeout)
         driver.get(url)
-        # small wait to let JS render essential parts
         time.sleep(wait)
         html = driver.page_source
         driver.quit()
@@ -90,28 +87,30 @@ def fetch_with_selenium(url: str, timeout: int = 20, wait: float = 2.0) -> Optio
 
 
 def fetch_patent_page(url: str, use_selenium: bool = False, timeout: int = 20) -> Optional[str]:
-    """Fetch Google Patents page HTML. Use Selenium if requested, otherwise requests."""
+    """Fetch Google Patents page HTML."""
     if use_selenium:
         html = fetch_with_selenium(url, timeout=timeout)
         if html:
             return html
-        # fallback
         return fetch_with_requests(url, timeout=timeout)
     return fetch_with_requests(url, timeout=timeout)
 
 
-def _get_text_by_selectors(soup: BeautifulSoup, selectors: List[str]) -> str:
-    for sel in selectors:
-        try:
-            if sel.startswith('//'):
-                # lxml/xpath not available through BeautifulSoup; skip
-                continue
-            el = soup.select_one(sel)
-            if el and el.get_text(strip=True):
-                return el.get_text(strip=True)
-        except Exception:
-            continue
-    return ""
+def extract_full_text(soup: BeautifulSoup) -> str:
+    """Extract all visible text from the page, excluding scripts and styles."""
+    # Remove script and style elements
+    for script in soup(["script", "style"]):
+        script.decompose()
+    
+    # Get text
+    text = soup.get_text()
+    
+    # Clean up whitespace
+    lines = (line.strip() for line in text.splitlines())
+    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+    text = '\n'.join(chunk for chunk in chunks if chunk)
+    
+    return text
 
 
 def parse_patent_data(html: str) -> Dict[str, Any]:
@@ -119,7 +118,18 @@ def parse_patent_data(html: str) -> Dict[str, Any]:
         raise RuntimeError("BeautifulSoup is not installed. Install with: pip install beautifulsoup4")
 
     soup = BeautifulSoup(html, 'html.parser')
-    data: Dict[str, Any] = {'title': '', 'status': '', 'year': '', 'abstract': '', 'description': '', 'claims': ''}
+    data: Dict[str, Any] = {
+        'title': '',
+        'status': '',
+        'year': '',
+        'abstract': '',
+        'description': '',
+        'claims': '',
+        'full_text': ''
+    }
+
+    # Extract full page text first
+    data['full_text'] = extract_full_text(soup)
 
     # Title: try meta tags, itemprop, h1
     title_selectors = [
@@ -138,13 +148,14 @@ def parse_patent_data(html: str) -> Dict[str, Any]:
                 title = meta.get('content').strip()
                 break
         else:
-            title = _get_text_by_selectors(soup, [sel])
-            if title:
-                break
+            el = soup.select_one(sel)
+            if el:
+                title = el.get_text(strip=True)
+                if title:
+                    break
     data['title'] = title or ''
 
-    # Status: look for pending/grant keywords near status labels
-    status_text = ''
+    # Status: pending/granted
     possible_status = soup.find_all(string=re.compile(r'pending|granted|published', re.I))
     if possible_status:
         status_text = possible_status[0].lower()
@@ -153,61 +164,78 @@ def parse_patent_data(html: str) -> Dict[str, Any]:
         elif 'granted' in status_text:
             data['status'] = 'granted'
 
-    # Year: find date-like strings
+    # Year: from date patterns
     date_elem = soup.find(string=re.compile(r'\d{4}-\d{2}-\d{2}'))
     if date_elem:
         m = re.search(r'(\d{4})', str(date_elem))
         if m:
             data['year'] = m.group(1)
     else:
-        # fallback: search for 4-digit year anywhere
         m2 = soup.find(string=re.compile(r'\b(19|20)\d{2}\b'))
         if m2:
             m = re.search(r'(19|20)\d{2}', str(m2))
             if m:
                 data['year'] = m.group(0)
 
-    # Abstract: try multiple selectors
-    abstract_selectors = [
-        'section.abstract',
-        'div.abstract',
-        'meta[name="DC.description"]',
-        'div[itemprop="abstract"]'
-    ]
-    abstract = ''
-    # meta
+    # Abstract
     meta_abs = soup.select_one('meta[name="DC.description"]')
     if meta_abs and meta_abs.get('content'):
-        abstract = meta_abs.get('content').strip()
-    if not abstract:
-        abstract = _get_text_by_selectors(soup, abstract_selectors)
-    data['abstract'] = abstract
-
-    # Description: try itemprop or sections near headings
-    desc = ''
-    desc = _get_text_by_selectors(soup, ['div[itemprop="description"]', 'section.description', 'div.description'])
-    if not desc:
+        data['abstract'] = meta_abs.get('content').strip()
+    else:
         for heading in soup.find_all(['h2', 'h3']):
-            txt = heading.get_text(strip=True).lower()
-            if 'description' in txt or 'detailed description' in txt:
+            if 'abstract' in heading.get_text().lower():
                 next_p = heading.find_next('p')
                 if next_p:
-                    desc = next_p.get_text(strip=True)
-                    break
-    data['description'] = (desc or '')[:2000]
+                    data['abstract'] = next_p.get_text(strip=True)
+                break
 
-    # Claims: try itemprop claims or sections
-    claims = ''
-    claims = _get_text_by_selectors(soup, ['section.claims', 'div.claims', 'div[itemprop="claims"]'])
-    if not claims:
-        for heading in soup.find_all(['h2', 'h3']):
-            if 'claim' in heading.get_text(strip=True).lower():
-                sec = heading.find_next(['div', 'section'])
-                if sec:
-                    items = sec.find_all(['li', 'p'])
-                    claims = '\n\n'.join([it.get_text(strip=True) for it in items[:5]])
+    # Description
+    for heading in soup.find_all(['h2', 'h3']):
+        txt = heading.get_text(strip=True).lower()
+        if 'description' in txt or 'detailed description' in txt:
+            next_p = heading.find_next('p')
+            if next_p:
+                data['description'] = next_p.get_text(strip=True)
+            break
+
+    # Claims: improved extraction until "similar documents"
+    claims_full = ''
+    claims_heading = None
+    for h in soup.find_all(['h1', 'h2', 'h3', 'h4']):
+        h_text = h.get_text(strip=True).lower()
+        if 'claim' in h_text or 'what is claimed' in h_text:
+            claims_heading = h
+            break
+    
+    if claims_heading:
+        all_text = []
+        current = claims_heading.find_next()
+        
+        while current:
+            curr_text = current.get_text(strip=True).lower()
+            
+            # Stop at "similar documents" or related sections
+            if any(stop_word in curr_text for stop_word in 
+                   ['similar documents', 'related patents', 'prior art', 'cited by', 'also published']):
+                break
+            
+            # Stop at other major sections
+            if current.name in ['h1', 'h2', 'h3', 'h4'] and current != claims_heading:
+                if any(word in curr_text for word in ['abstract', 'description', 'figure', 'inventor', 'applicant']):
                     break
-    data['claims'] = (claims or '')[:1500]
+            
+            # Collect text
+            if current.name in ['li', 'p', 'div', 'span']:
+                text = current.get_text(strip=True)
+                if text and len(text) > 5:
+                    all_text.append(text)
+            
+            current = current.find_next()
+        
+        if all_text:
+            claims_full = '\n\n'.join(all_text)
+    
+    data['claims'] = claims_full
 
     return data
 
@@ -245,8 +273,10 @@ def create_pdf(patent_data: Dict[str, Any], output_path: str) -> bool:
         heading_style = ParagraphStyle('CustomHeading', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#2e5c8a'), spaceAfter=8, spaceBefore=12, fontName='Helvetica-Bold')
         body_style = ParagraphStyle('CustomBody', parent=styles['BodyText'], fontSize=10, alignment=4)
 
+        # Title and metadata
         title = patent_data.get('title', 'Patent Document')
         story.append(Paragraph(title, title_style))
+        
         metadata = []
         if patent_data.get('status'):
             metadata.append(f"<b>Status:</b> {patent_data['status'].capitalize()}")
@@ -255,13 +285,16 @@ def create_pdf(patent_data: Dict[str, Any], output_path: str) -> bool:
         if metadata:
             story.append(Paragraph(" | ".join(metadata), body_style))
             story.append(Spacer(1, 12))
+
+        # Structured sections if available
         if patent_data.get('abstract'):
             story.append(Paragraph("Abstract", heading_style))
             abstract_text = patent_data['abstract']
-            if len(abstract_text) > 1000:
-                abstract_text = abstract_text[:1000] + "..."
+            if len(abstract_text) > 2000:
+                abstract_text = abstract_text[:2000] + "..."
             story.append(Paragraph(abstract_text, body_style))
             story.append(Spacer(1, 12))
+
         if patent_data.get('description'):
             story.append(Paragraph("Description", heading_style))
             description_text = patent_data['description']
@@ -269,13 +302,26 @@ def create_pdf(patent_data: Dict[str, Any], output_path: str) -> bool:
                 description_text = description_text[:2000] + "..."
             story.append(Paragraph(description_text, body_style))
             story.append(Spacer(1, 12))
+
         if patent_data.get('claims'):
             story.append(PageBreak() if len(story) > 10 else Spacer(1, 12))
             story.append(Paragraph("Claims", heading_style))
             claims_text = patent_data['claims']
-            if len(claims_text) > 1500:
-                claims_text = claims_text[:1500] + "..."
+            if len(claims_text) > 5000:
+                claims_text = claims_text[:5000] + "..."
             story.append(Paragraph(claims_text, body_style))
+            story.append(Spacer(1, 12))
+
+        # Full page text
+        if patent_data.get('full_text'):
+            story.append(PageBreak())
+            story.append(Paragraph("Full Page Content", heading_style))
+            full_text = patent_data['full_text']
+            # Limit to reasonable size
+            if len(full_text) > 15000:
+                full_text = full_text[:15000] + "... [truncated]"
+            story.append(Paragraph(full_text, body_style))
+
         doc.build(story)
         return True
     except Exception as e:
@@ -293,9 +339,9 @@ def _read_links_file(p: Path) -> List[str]:
 
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Parse Google Patents and save information to PDF")
-    parser.add_argument("--url", "-u", help="Google Patents URL (e.g., https://patents.google.com/patent/US1234567B2)")
+    parser.add_argument("--url", "-u", help="Google Patents URL")
     parser.add_argument("--links-file", help="Path to file with one Google Patents URL per line (batch mode)")
-    parser.add_argument("--output", "-o", help="Output PDF file path (auto-generated if not specified for single URL)")
+    parser.add_argument("--output", "-o", help="Output PDF file path (auto-generated if not specified)")
     parser.add_argument("--output-dir", "-d", help="Directory to save PDFs (defaults to current directory)", default='.')
     parser.add_argument("--use-selenium", action='store_true', help="Use Selenium (headless Chrome) for fetching pages")
     parser.add_argument("--timeout", type=int, default=20, help="Page load timeout seconds")
