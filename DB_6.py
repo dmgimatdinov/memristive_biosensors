@@ -1641,10 +1641,23 @@ class BiosensorGUI:
             immob_t_max = immob_layer['T_Max']
             mem_t_max = mem_layer['T_Max']
 
-            # Проверка температур
+            bio_t_min = bio_layer['T_Min']
+            immob_t_min = immob_layer['T_Min']
+            mem_t_min = mem_layer['T_Min']
+
+            # Извлечение механической совместимости
+            
+
+            # Проверка температурной устойчивости аналита
             if not (bio_t_max < analyte_t_max and immob_t_max < analyte_t_max and mem_t_max < analyte_t_max):
                 st.info("ℹ️ Температура одного из слоёв превышает температуру аналита. Комбинация не создана.")
                 return
+            
+            # Проверка температурной совместимости слоев
+            if not (mem_t_min <= bio_t_min and bio_t_max <= mem_t_max and 
+                    mem_t_min <= immob_t_min and immob_t_max <= mem_t_max):
+                 st.info("ℹ️ Рабочие температурные диапозоны слоевн не допустимы для слоя MEM. Комбинация не создана.")
+
 
             # Если все проверки пройдены, создаём комбинацию
             combination_data = {
