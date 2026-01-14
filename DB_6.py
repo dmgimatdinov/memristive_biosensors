@@ -1610,6 +1610,16 @@ class BiosensorGUI:
 
     def create_sensor_combinations(self):
         """Создание комбинаций сенсоров на основе пересечения диапазонов pH и температур."""
+
+        # Установка диапазонов для условий совместимости
+        MP_ADD = 0.5  # ГПа
+
+        ADH_MIN = None
+        ADH_MAX = None
+
+        SOL_MIN = None
+        SOL_MAX = None
+
         try:
             # Загрузка одного паспорта каждого типа
             analyte = self.db_manager.get_analyte_by_id("TA001")  # Укажите ID аналита
@@ -1628,13 +1638,6 @@ class BiosensorGUI:
             immob_ph_min, immob_ph_max = immob_layer['PH_Min'], immob_layer['PH_Max']
             mem_ph_min, mem_ph_max = mem_layer['PH_Min'], mem_layer['PH_Max']
 
-            # Проверка пересечения диапазонов pH
-            if not (analyte_ph_min <= bio_ph_max and analyte_ph_max >= bio_ph_min and
-                    analyte_ph_min <= immob_ph_max and analyte_ph_max >= immob_ph_min and
-                    analyte_ph_min <= mem_ph_max and analyte_ph_max >= mem_ph_min):
-                st.info("ℹ️ Диапазоны pH не пересекаются. Комбинация не создана.")
-                return
-
             # Извлечение температур
             analyte_t_max = analyte['T_Max']
             bio_t_max = bio_layer['T_Max']
@@ -1646,7 +1649,19 @@ class BiosensorGUI:
             mem_t_min = mem_layer['T_Min']
 
             # Извлечение механической совместимости
-            
+            immob_mp = immob_layer['MP']
+            mem_mp = mem_layer['MP']
+
+            # Извлечение адгезии и растворимости
+            immob_adh = immob_layer['Adh']
+            immob_sol = immob_layer['Sol']
+
+            # Проверка пересечения диапазонов pH
+            if not (analyte_ph_min <= bio_ph_max and analyte_ph_max >= bio_ph_min and
+                    analyte_ph_min <= immob_ph_max and analyte_ph_max >= immob_ph_min and
+                    analyte_ph_min <= mem_ph_max and analyte_ph_max >= mem_ph_min):
+                st.info("ℹ️ Диапазоны pH не пересекаются. Комбинация не создана.")
+                return
 
             # Проверка температурной устойчивости аналита
             if not (bio_t_max < analyte_t_max and immob_t_max < analyte_t_max and mem_t_max < analyte_t_max):
@@ -1656,8 +1671,91 @@ class BiosensorGUI:
             # Проверка температурной совместимости слоев
             if not (mem_t_min <= bio_t_min and bio_t_max <= mem_t_max and 
                     mem_t_min <= immob_t_min and immob_t_max <= mem_t_max):
-                 st.info("ℹ️ Рабочие температурные диапозоны слоевн не допустимы для слоя MEM. Комбинация не создана.")
+                 st.info("ℹ️ Рабочие температурные диапозоны слоев не допустимы для слоя MEM. Комбинация не создана.")
 
+            # Проверка механической совместимости слоев
+            if not (immob_mp - mem_mp < MP_ADD):
+                st.info("ℹ️ Модуль Юнга иммобилизационного слоя превышает модуль мемристивного слоя. Комбинация не создана.")
+                return
+            
+            # Проверка адгезии
+            if not (ADH_MIN <= immob_adh <= ADH_MAX):
+                st.info("ℹ️ Адгезия иммобилизационного слоя вне допустимого диапазона. Комбинация не создана.")
+                return
+            
+            # Проверка растворимости
+            if not (SOL_MIN <= immob_sol <= SOL_MAX):
+                st.info("ℹ️ Растворимость иммобилизационного слоя вне допустимого диапазона. Комбинация не создана.")
+                return
+
+            # РАСЧЕТ ИНТЕГРАЛЬНЫХ ХАРАКТЕРИСТИКИ
+
+            # Константы
+            K_IM = 1.0  # Коэффициент потерь иммобилизационного слоя
+
+            # Чувствительность (SN_total)
+            # Извлечение значений чувствительности
+            bio_sn = bio_layer['SN']
+            mem_sn = mem_layer['SN']
+
+            # Расчёт итоговой чувствительности
+            SN_total = bio_sn * mem_sn * K_IM
+
+            # Время отклика (TR_total)
+            bio_tr = bio_layer['TR']
+            immob_tr = immob_layer['TR']
+            mem_tr = mem_layer['TR']
+
+            # Расчёт итогового времени отклика
+            TR_total = bio_tr + immob_tr + mem_tr
+
+            # Стабильность (ST_total)
+            bio_st = bio_layer['ST']
+            immob_st = immob_layer['ST']
+            mem_st = mem_layer['ST']
+
+            # Расчёт итоговой стабильности
+            ST_total = min(bio_st, immob_st, mem_st)
+
+            # Воспроизводимость (RP_total)
+            bio_rp = bio_layer['RP']
+            immob_rp = immob_layer['RP']
+            mem_rp = mem_layer['RP']
+
+            # Расчёт итоговой воспроизводимости
+            RP_total = min(bio_rp, immob_rp, mem_rp)
+
+            # Предел обнаружения (LOD_total)
+            bio_lod = bio_layer['LOD']
+            mem_lod = mem_layer['LOD']
+
+            # Расчёт итогового предела обнаружения
+            LOD_total = max(bio_lod, mem_lod)
+
+            # Диапазон (DR_total)
+            bio_dr_min = bio_layer['DR_Min']
+            bio_dr_max = bio_layer['DR_Max']
+            mem_dr_min = mem_layer['DR_Min']
+            mem_dr_max = mem_layer['DR_Max']
+
+            # Расчёт итогового диапазона
+            DR_total = (min(bio_dr_max, mem_dr_max) - max(bio_dr_min, mem_dr_min)) # Поиск пересечения диапазонов
+
+            # Долговечность (HL)
+            bio_hl = bio_layer['HL']
+            immob_hl = immob_layer['HL']
+            mem_hl = mem_layer['HL']
+
+            # Расчёт итоговой долговечности
+            HL_total = min(bio_hl, immob_hl, mem_hl)
+
+            # Энергопотребление (PC_total)
+            bio_pc = bio_layer['PC']
+            immob_pc = immob_layer['PC']
+            mem_pc = mem_layer['PC']
+
+            # Расчёт итогового энергопотребления
+            PC_total = bio_pc + immob_pc + mem_pc
 
             # Если все проверки пройдены, создаём комбинацию
             combination_data = {
@@ -1666,14 +1764,14 @@ class BiosensorGUI:
                 'BRE_ID': bio_layer['BRE_ID'],
                 'IM_ID': immob_layer['IM_ID'],
                 'MEM_ID': mem_layer['MEM_ID'],
-                'SN_total': None,  # Здесь можно рассчитать итоговые значения
-                'TR_total': None,
-                'ST_total': None,
-                'RP_total': None,
-                'LOD_total': None,
-                'DR_total': None,
-                'HL_total': None,
-                'PC_total': None,
+                'SN_total': SN_total,  # Здесь можно рассчитать итоговые значения
+                'TR_total': TR_total,
+                'ST_total': ST_total,
+                'RP_total': RP_total,
+                'LOD_total': LOD_total,
+                'DR_total': DR_total,
+                'HL_total': HL_total,
+                'PC_total': PC_total,
                 'Score': None,  # Здесь можно рассчитать итоговый балл
                 'created_at': None  # Автоматически заполняется в БД
             }
