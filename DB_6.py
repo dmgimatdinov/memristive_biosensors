@@ -7,6 +7,8 @@ import logging
 import streamlit as st
 import atexit
 
+import math
+
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, filename='biosensor.log',
                     format='%(asctime)s - %(levelname)s - %(message)s')
@@ -1608,6 +1610,12 @@ class BiosensorGUI:
             st.error(f"❌ Ошибка сохранения: {str(e)}")
             self.logger.error(f"Ошибка сохранения паспортов: {e}")
 
+    def normolize(self, value, kind):
+        """Нормализация значения в диапазоне 0-1 в зависимости от типа характеристики."""
+        if (kind == 'SN' or kind == 'LOD'):
+            result = math.log(10, value)
+
+        
     def create_sensor_combinations(self):
         """Создание комбинаций сенсоров на основе пересечения диапазонов pH и температур."""
 
@@ -1756,6 +1764,9 @@ class BiosensorGUI:
 
             # Расчёт итогового энергопотребления
             PC_total = bio_pc + immob_pc + mem_pc
+
+            # Расчет итогового балла (Score)
+
 
             # Если все проверки пройдены, создаём комбинацию
             combination_data = {
