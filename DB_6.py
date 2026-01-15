@@ -1705,7 +1705,7 @@ class BiosensorGUI:
                 return
 
             # Проверка температурной устойчивости аналита
-            if not (bio_t_max < analyte_t_max and immob_t_max < analyte_t_max and mem_t_max < analyte_t_max):
+            if not (bio_t_max <= analyte_t_max and immob_t_max <= analyte_t_max and mem_t_max <= analyte_t_max):
                 self.logger.info("ℹ️ Температура одного из слоёв превышает температуру аналита. Комбинация не создана.")
                 return
             
@@ -1831,12 +1831,14 @@ class BiosensorGUI:
 
             # Создание идентификатора комбинации
             Combo_ID = f"COMBO_{analyte['TA_ID']}_{bio_layer['BRE_ID']}_{immob_layer['IM_ID']}_{mem_layer['MEM_ID']}"
-           
+
+            '''
             # Проверка на существование комбинации
             existing_combo = self.db_manager.get_sensor_combination_by_id(Combo_ID)
             if existing_combo:
                 self.logger.info(f"ℹ️ Комбинация {Combo_ID} уже существует в базе данных.")
                 return
+            '''
         
             # Если все проверки пройдены, создаём комбинацию
             combination_data = {
