@@ -1318,6 +1318,7 @@ class BiosensorGUI:
         
         with col1:
             if st.button("🏆 Лучшие комбинации", width="stretch"):
+                self.sythesize_sensor_combinations()
                 self.show_best_combinations()
         
         with col2:
@@ -1618,29 +1619,58 @@ class BiosensorGUI:
         result = math.log(10, value)
         return result
 
+    # Рассмотрение всех паспортов базы данных и создание комбинаций сенсоров
+    def sythesize_sensor_combinations(self):
+        """Синтез комбинаций сенсоров на основе всех паспортов в базе данных."""
+        analytes = self.db_manager.list_all_analytes()
+        bio_layers = self.db_manager.list_all_bio_recognition_layers()
+        immob_layers = self.db_manager.list_all_immobilization_layers()
+        mem_layers = self.db_manager.list_all_memristive_layers()
+
+        total_combinations = 0
+        successful_combinations = 0
+
+        for analyte in analytes:
+            for bio_layer in bio_layers:
+                for immob_layer in immob_layers:
+                    for mem_layer in mem_layers:
+                        total_combinations += 1
+                        try:
+                            result = self.create_sensor_combination(
+                                analyte['TA_ID'],
+                                bio_layer['BRE_ID'],
+                                immob_layer['IM_ID'],
+                                mem_layer['MEM_ID']
+                            )
+                            if result == True:
+                                successful_combinations += 1
+                        except Exception as e:
+                            self.logger.error(f"Ошибка при создании комбинации: {e}")
+
+        self.logger.info(f"Всего комбинаций: {total_combinations}, Успешных: {successful_combinations}")
         
-    def create_sensor_combinations(self):
+    def create_sensor_combination(self, analyte_id, bio_id, immob_id, mem_id):
         """Создание комбинаций сенсоров на основе пересечения диапазонов pH и температур."""
 
         # Установка диапазонов для условий совместимости
         MP_ADD = 0.5  # ГПа
 
-        ADH_MIN = None
-        ADH_MAX = None
+        ADH_MIN = "Низкая"
+        ADH_MAX = "Высокая"
 
-        SOL_MIN = None
-        SOL_MAX = None
+        SOL_MIN = "Низкая"
+        SOL_MAX = "Высокая"
 
         try:
             # Загрузка одного паспорта каждого типа
-            analyte = self.db_manager.get_analyte_by_id("TA001")  # Укажите ID аналита
-            bio_layer = self.db_manager.get_bio_recognition_layer_by_id("BRE001")  # Укажите ID биослоя
-            immob_layer = self.db_manager.get_immobilization_layer_by_id("IM001")  # Укажите ID иммобилизации
-            mem_layer = self.db_manager.get_memristive_layer_by_id("MEM001")  # Укажите ID мемристора
+            analyte = self.db_manager.get_analyte_by_id(analyte_id)  # Укажите ID аналита
+            bio_layer = self.db_manager.get_bio_recognition_layer_by_id(bio_id)  # Укажите ID биослоя
+            immob_layer = self.db_manager.get_immobilization_layer_by_id(immob_id)  # Укажите ID иммобилизации
+            mem_layer = self.db_manager.get_memristive_layer_by_id(mem_id)  # Укажите ID мемристора
 
             # Проверка наличия всех данных
             if not (analyte and bio_layer and immob_layer and mem_layer):
-                st.error("❌ Не удалось загрузить все слои. Проверьте наличие данных в базе.")
+                self.logger.info("❌ Не удалось загрузить все слои. Проверьте наличие данных в базе.")
                 return
 
             # Извлечение диапазонов pH
@@ -1671,37 +1701,37 @@ class BiosensorGUI:
             if not (analyte_ph_min <= bio_ph_max and analyte_ph_max >= bio_ph_min and
                     analyte_ph_min <= immob_ph_max and analyte_ph_max >= immob_ph_min and
                     analyte_ph_min <= mem_ph_max and analyte_ph_max >= mem_ph_min):
-                st.info("ℹ️ Диапазоны pH не пересекаются. Комбинация не создана.")
+                self.logger.info("ℹ️ Диапазоны pH не пересекаются. Комбинация не создана.")
                 return
 
             # Проверка температурной устойчивости аналита
             if not (bio_t_max < analyte_t_max and immob_t_max < analyte_t_max and mem_t_max < analyte_t_max):
-                st.info("ℹ️ Температура одного из слоёв превышает температуру аналита. Комбинация не создана.")
+                self.logger.info("ℹ️ Температура одного из слоёв превышает температуру аналита. Комбинация не создана.")
                 return
             
             # Проверка температурной совместимости слоев
             if not (mem_t_min <= bio_t_min and bio_t_max <= mem_t_max and 
                     mem_t_min <= immob_t_min and immob_t_max <= mem_t_max):
-                 st.info("ℹ️ Рабочие температурные диапозоны слоев не допустимы для слоя MEM. Комбинация не создана.")
+                 self.logger.info("ℹ️ Рабочие температурные диапозоны слоев не допустимы для слоя MEM. Комбинация не создана.")
 
+            '''
             # Проверка механической совместимости слоев
             if not (immob_mp - mem_mp < MP_ADD):
-                st.info("ℹ️ Модуль Юнга иммобилизационного слоя превышает модуль мемристивного слоя. Комбинация не создана.")
+                self.logger.info("ℹ️ Модуль Юнга иммобилизационного слоя превышает модуль мемристивного слоя. Комбинация не создана.")
                 return
             
             # Проверка адгезии
             if not (ADH_MIN <= immob_adh <= ADH_MAX):
-                st.info("ℹ️ Адгезия иммобилизационного слоя вне допустимого диапазона. Комбинация не создана.")
+                self.logger.info("ℹ️ Адгезия иммобилизационного слоя вне допустимого диапазона. Комбинация не создана.")
                 return
             
             # Проверка растворимости
             if not (SOL_MIN <= immob_sol <= SOL_MAX):
-                st.info("ℹ️ Растворимость иммобилизационного слоя вне допустимого диапазона. Комбинация не создана.")
+                self.logger.info("ℹ️ Растворимость иммобилизационного слоя вне допустимого диапазона. Комбинация не создана.")
                 return
+            '''
 
             # РАСЧЕТ ИНТЕГРАЛЬНЫХ ХАРАКТЕРИСТИКИ
-
-            # Константы
 
             # Чувствительность (SN_total)
             # Извлечение значений чувствительности
@@ -1799,9 +1829,18 @@ class BiosensorGUI:
                      HL_total_norm * w_HL_total_norm +
                      PC_total_norm * w_PC_total_norm) / С  # Чем меньше энергопотребление, тем лучше
 
+            # Создание идентификатора комбинации
+            Combo_ID = f"COMBO_{analyte['TA_ID']}_{bio_layer['BRE_ID']}_{immob_layer['IM_ID']}_{mem_layer['MEM_ID']}"
+           
+            # Проверка на существование комбинации
+            existing_combo = self.db_manager.get_sensor_combination_by_id(Combo_ID)
+            if existing_combo:
+                self.logger.info(f"ℹ️ Комбинация {Combo_ID} уже существует в базе данных.")
+                return
+        
             # Если все проверки пройдены, создаём комбинацию
             combination_data = {
-                'Combo_ID': "COMBO001",  # Уникальный ID комбинации
+                'Combo_ID': Combo_ID,  # Уникальный ID комбинации
                 'TA_ID': analyte['TA_ID'],
                 'BRE_ID': bio_layer['BRE_ID'],
                 'IM_ID': immob_layer['IM_ID'],
@@ -1821,18 +1860,15 @@ class BiosensorGUI:
             # Добавление комбинации в базу данных
             result = self.db_manager.insert_sensor_combination(combination_data)
             if result == "DUPLICATE":
-                st.warning(f"⚠️ Комбинация {combination_data['Combo_ID']} уже существует.")
+                self.logger.info(f"⚠️ Комбинация {combination_data['Combo_ID']} уже существует.")
             elif result:
-                st.success(f"✅ Комбинация {combination_data['Combo_ID']} успешно добавлена в базу данных.")
+                self.logger.info(f"✅ Комбинация {combination_data['Combo_ID']} успешно добавлена в базу данных.")
+                return True
             else:
-                st.error("❌ Ошибка добавления комбинации в базу данных.")
+                self.logger.info("❌ Ошибка добавления комбинации в базу данных.")
         except Exception as e:
-            st.error(f"❌ Ошибка при создании комбинации: {str(e)}")
+            # st.error(f"❌ Ошибка при создании комбинации: {str(e)}")
             self.logger.error(f"Ошибка при создании комбинации: {e}")
-
-    def save_sensor_combinations_to_db(self):
-        
-        return 0
 
     # streamlit
     @staticmethod
