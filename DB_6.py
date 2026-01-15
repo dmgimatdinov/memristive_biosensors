@@ -1610,10 +1610,13 @@ class BiosensorGUI:
             st.error(f"❌ Ошибка сохранения: {str(e)}")
             self.logger.error(f"Ошибка сохранения паспортов: {e}")
 
-    def normolize(self, value, kind):
+    def normolize(self, value, kind=None):
         """Нормализация значения в диапазоне 0-1 в зависимости от типа характеристики."""
-        if (kind == 'SN' or kind == 'LOD'):
-            result = math.log(10, value)
+        if value == None:
+            return 0.0
+        # if (kind == 'SN' or kind == 'LOD'):
+        result = math.log(10, value)
+        return result
 
         
     def create_sensor_combinations(self):
@@ -1708,6 +1711,8 @@ class BiosensorGUI:
 
             # Расчёт итоговой чувствительности
             SN_total = bio_sn * mem_sn * K_IM
+            SN_total_norm = self.normolize(SN_total, kind='SN')
+            w_SN_total_norm = 1 # коэффициент веса (важности) для чувствительности
 
             # Время отклика (TR_total)
             bio_tr = bio_layer['TR']
@@ -1716,6 +1721,8 @@ class BiosensorGUI:
 
             # Расчёт итогового времени отклика
             TR_total = bio_tr + immob_tr + mem_tr
+            TR_total_norm = self.normolize(TR_total, kind='TR')
+            w_TR_total_norm = 1  # коэффициент веса (важности) для времени отклика
 
             # Стабильность (ST_total)
             bio_st = bio_layer['ST']
@@ -1724,6 +1731,8 @@ class BiosensorGUI:
 
             # Расчёт итоговой стабильности
             ST_total = min(bio_st, immob_st, mem_st)
+            ST_total_norm = self.normolize(ST_total, kind='ST')
+            w_ST_total_norm = 1  # коэффициент веса (важности) для стабильности
 
             # Воспроизводимость (RP_total)
             bio_rp = bio_layer['RP']
@@ -1732,6 +1741,8 @@ class BiosensorGUI:
 
             # Расчёт итоговой воспроизводимости
             RP_total = min(bio_rp, immob_rp, mem_rp)
+            RP_total_norm = self.normolize(RP_total, kind='RP')
+            w_RP_total_norm = 1  # коэффициент веса (важности) для воспроизводимости
 
             # Предел обнаружения (LOD_total)
             bio_lod = bio_layer['LOD']
@@ -1739,6 +1750,8 @@ class BiosensorGUI:
 
             # Расчёт итогового предела обнаружения
             LOD_total = max(bio_lod, mem_lod)
+            LOD_total_norm = self.normolize(LOD_total, kind='LOD')
+            w_LOD_total_norm = 1  # коэффициент веса (важности) для предела обнаружения
 
             # Диапазон (DR_total)
             bio_dr_min = bio_layer['DR_Min']
@@ -1748,6 +1761,8 @@ class BiosensorGUI:
 
             # Расчёт итогового диапазона
             DR_total = (min(bio_dr_max, mem_dr_max) - max(bio_dr_min, mem_dr_min)) # Поиск пересечения диапазонов
+            DR_total_norm = self.normolize(DR_total, kind='DR')
+            w_DR_total_norm = 1  # коэффициент веса (важности) для диапазона
 
             # Долговечность (HL)
             bio_hl = bio_layer['HL']
@@ -1756,6 +1771,8 @@ class BiosensorGUI:
 
             # Расчёт итоговой долговечности
             HL_total = min(bio_hl, immob_hl, mem_hl)
+            HL_total_norm = self.normolize(HL_total, kind='HL')
+            w_HL_total_norm = 1  # коэффициент веса (важности) для долговечности
 
             # Энергопотребление (PC_total)
             bio_pc = bio_layer['PC']
@@ -1764,9 +1781,23 @@ class BiosensorGUI:
 
             # Расчёт итогового энергопотребления
             PC_total = bio_pc + immob_pc + mem_pc
+            PC_total_norm = self.normolize(PC_total, kind='PC')
+            w_PC_total_norm = 1  # коэффициент веса (важности) для энергопотребления
+
+            # Расчет коэффициента достоверности
+            alfa = 0.3 # штраф за неполноту данных
+            ro = 1 # доля известных параметров
+            С = 1 - alfa * (1 - ro) # коэффициент достоверности
 
             # Расчет итогового балла (Score)
-
+            Score = (SN_total_norm * w_SN_total_norm +
+                     TR_total_norm * w_TR_total_norm +  # Чем меньше время отклика, тем лучше
+                     ST_total_norm * w_ST_total_norm +
+                     RP_total_norm * w_RP_total_norm +
+                     LOD_total_norm * w_LOD_total_norm +  # Чем меньше LOD, тем лучше
+                     DR_total_norm * w_DR_total_norm +
+                     HL_total_norm * w_HL_total_norm +
+                     PC_total_norm * w_PC_total_norm) / С  # Чем меньше энергопотребление, тем лучше
 
             # Если все проверки пройдены, создаём комбинацию
             combination_data = {
@@ -1783,7 +1814,7 @@ class BiosensorGUI:
                 'DR_total': DR_total,
                 'HL_total': HL_total,
                 'PC_total': PC_total,
-                'Score': None,  # Здесь можно рассчитать итоговый балл
+                'Score': Score,  # Здесь можно рассчитать итоговый балл
                 'created_at': None  # Автоматически заполняется в БД
             }
 
