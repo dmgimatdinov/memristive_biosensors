@@ -1880,128 +1880,6 @@ class BiosensorGUI:
         st.session_state.clear()
         st.info("✅ Форма очищена. Страница перезагружена.")
         st.rerun()
-
-    # # streamlit
-    # def load_passport_from_db_streamlit(self):
-    #     """Загрузка паспорта из БД для Streamlit."""
-    #     st.subheader("📂 Загрузить паспорт из БД")
-    #     debug("load_passport_from_db_streamlit")
-    #     col1, col2 = st.columns(2)
-        
-    #     with col1:
-    #         data_type = st.selectbox(
-    #             "Выберите тип данных",
-    #             ["Аналит (TA)", "Биослой (BRE)", "Иммобилизация (IM)", "Мемристор (MEM)"],
-    #             key="load_data_type"
-    #         )
-    #         debug("Выберите тип данных")
-        
-    #     debug(data_type)
-    #     with col2:
-    #         layer_id = st.text_input("Введите ID", key="load_layer_id", value="test")
-            
-    #     debug(st.session_state.get('load_layer_id'))
-
-    #     if st.button("📥 Загрузить", key="load_execute_btn", width="stretch"):
-    #         debug("Зажата клавиша Загрузить")
-    #         if not layer_id:
-    #             st.error("❌ Введите ID!")
-    #             return
-            
-    #         try:
-    #             debug("try)analyte")
-    #             if data_type == "Аналит (TA)":
-    #                 data = self.db_manager.get_analyte_by_id(layer_id)
-    #                 debug("Аналит (TA)")
-    #                 if data:
-    #                     st.session_state['analyte_ta_id'] = data['TA_ID']
-    #                     debug(data['TA_ID'])
-    #                     st.session_state['analyte_ta_name'] = data['TA_Name'] or ''
-    #                     st.session_state['analyte_ph_min'] = data['PH_Min']
-    #                     st.session_state['analyte_ph_max'] = data['PH_Max']
-    #                     st.session_state['analyte_t_max'] = data['T_Max']
-    #                     st.session_state['analyte_stability'] = data['ST']
-    #                     st.session_state['analyte_half_life'] = data['HL']
-    #                     st.session_state['analyte_power_consumption'] = data['PC']
-    #                     st.session_state['active_section'] = 'data_entry'
-    #                     st.success("✅ Аналит загружен!")
-    #                     st.rerun()
-    #                 else:
-    #                     st.error("❌ Аналит не найден!")
-                
-    #             elif data_type == "Биослой (BRE)":
-    #                 data = self.db_manager.get_bio_recognition_layer_by_id(layer_id)
-    #                 if data:
-    #                     st.session_state['bio_bre_id'] = data['BRE_ID']
-    #                     st.session_state['bio_bre_name'] = data['BRE_Name'] or ''
-    #                     st.session_state['bio_ph_min'] = data['PH_Min']
-    #                     st.session_state['bio_ph_max'] = data['PH_Max']
-    #                     st.session_state['bio_t_min'] = data['T_Min']
-    #                     st.session_state['bio_t_max'] = data['T_Max']
-    #                     st.session_state['bio_sensitivity'] = data['SN']
-    #                     st.session_state['bio_dr_min'] = data['DR_Min']
-    #                     st.session_state['bio_dr_max'] = data['DR_Max']
-    #                     st.session_state['bio_reproducibility'] = data['RP']
-    #                     st.session_state['bio_response_time'] = data['TR']
-    #                     st.session_state['bio_stability'] = data['ST']
-    #                     st.session_state['bio_lod'] = data['LOD']
-    #                     st.session_state['bio_durability'] = data['HL']
-    #                     st.session_state['bio_power_consumption'] = data['PC']
-    #                     st.success("✅ Биослой загружен!")
-    #                     st.rerun()
-    #                 else:
-    #                     st.error("❌ Биослой не найден!")
-                
-    #             elif data_type == "Иммобилизация (IM)":
-    #                 data = self.db_manager.get_immobilization_layer_by_id(layer_id)
-    #                 if data:
-    #                     st.session_state['immob_im_id'] = data['IM_ID']
-    #                     st.session_state['immob_im_name'] = data['IM_Name'] or ''
-    #                     st.session_state['immob_ph_min'] = data['PH_Min']
-    #                     st.session_state['immob_ph_max'] = data['PH_Max']
-    #                     st.session_state['immob_t_min'] = data['T_Min']
-    #                     st.session_state['immob_t_max'] = data['T_Max']
-    #                     st.session_state['immob_young_modulus'] = data['MP']
-    #                     st.session_state['immob_adhesion'] = data['Adh'] or ''
-    #                     st.session_state['immob_solubility'] = data['Sol'] or ''
-    #                     st.session_state['immob_loss_coefficient'] = data['K_IM']
-    #                     st.session_state['immob_reproducibility'] = data['RP']
-    #                     st.session_state['immob_response_time'] = data['TR']
-    #                     st.session_state['immob_stability'] = data['ST']
-    #                     st.session_state['immob_durability'] = data['HL']
-    #                     st.session_state['immob_power_consumption'] = data['PC']
-    #                     st.success("✅ Иммобилизационный слой загружен!")
-    #                     st.rerun()
-    #                 else:
-    #                     st.error("❌ Иммобилизационный слой не найден!")
-                
-    #             elif data_type == "Мемристор (MEM)":
-    #                 data = self.db_manager.get_memristive_layer_by_id(layer_id)
-    #                 if data:
-    #                     st.session_state['mem_mem_id'] = data['MEM_ID']
-    #                     st.session_state['mem_mem_name'] = data['MEM_Name'] or ''
-    #                     st.session_state['mem_ph_min'] = data['PH_Min']
-    #                     st.session_state['mem_ph_max'] = data['PH_Max']
-    #                     st.session_state['mem_t_min'] = data['T_Min']
-    #                     st.session_state['mem_t_max'] = data['T_Max']
-    #                     st.session_state['mem_young_modulus'] = data['MP']
-    #                     st.session_state['mem_sensitivity'] = data['SN']
-    #                     st.session_state['mem_dr_min'] = data['DR_Min']
-    #                     st.session_state['mem_dr_max'] = data['DR_Max']
-    #                     st.session_state['mem_reproducibility'] = data['RP']
-    #                     st.session_state['mem_response_time'] = data['TR']
-    #                     st.session_state['mem_stability'] = data['ST']
-    #                     st.session_state['mem_lod'] = data['LOD']
-    #                     st.session_state['mem_durability'] = data['HL']
-    #                     st.session_state['mem_power_consumption'] = data['PC']
-    #                     st.success("✅ Мемристивный слой загружен!")
-    #                     st.rerun()
-    #                 else:
-    #                     st.error("❌ Мемристивный слой не найден!")
-            
-    #         except Exception as e:
-    #             st.error(f"❌ Ошибка загрузки: {str(e)}")
-    #             self.logger.error(f"Ошибка загрузки паспорта: {e}")
     
     def load_passport_from_db_streamlit(self):
         st.subheader("📁 Загрузить паспорт из БД")
@@ -2010,7 +1888,7 @@ class BiosensorGUI:
         with col1:
             datatype = st.selectbox("Выберите тип слоя", ["TA", "BRE", "IM", "MEM"], key="load_datatype")
         with col2:
-            layer_id = st.textinput("ID слоя", key="load_layer_id")
+            layer_id = st.text_input("ID слоя", key="load_layer_id")
         
         if st.button("Загрузить", key="load_execute_btn"):
             if not layer_id:
@@ -2021,87 +1899,87 @@ class BiosensorGUI:
                 if datatype == "TA":
                     data = self.db_manager.get_analyte_by_id(layer_id)
                     if data:
-                        st.session_state.analyte_ta_id = data['TA_ID']
-                        st.session_state.analyte_ta_name = data.get('TA_Name') or ""
-                        st.session_state.analyte_ph_min = data.get('PH_Min') or 0
-                        st.session_state.analyte_ph_max = data.get('PH_Max') or 0
-                        st.session_state.analyte_t_max = data.get('T_Max') or 0
-                        st.session_state.analyte_stability = data.get('ST') or 0
-                        st.session_state.analyte_half_life = data.get('HL') or 0
-                        st.session_state.analyte_power_consumption = data.get('PC') or 0
+                        # ✅ ПРАВИЛЬНЫЕ КЛЮЧИ (соответствуют key= в create_data_entry_tab)
+                        st.session_state['analyte_ta_id'] = data.get('TA_ID', '')
+                        st.session_state['analyte_ta_name'] = data.get('TA_Name', '')
+                        st.session_state['analyte_ph_min'] = data.get('PH_Min', 0)
+                        st.session_state['analyte_ph_max'] = data.get('PH_Max', 0)
+                        st.session_state['analyte_t_max'] = data.get('T_Max', 0)
+                        st.session_state['analyte_stability'] = data.get('ST', 0)
+                        st.session_state['analyte_half_life'] = data.get('HL', 0)
+                        st.session_state['analyte_power_consumption'] = data.get('PC', 0)
                         
-                        st.success(f"✅ Паспорт TA '{data['TA_Name']}' загружен! Данные заполнены в форме.")
-                        # НЕ меняем active_section сразу!
+                        st.success(f"✅ Паспорт TA '{data.get('TA_Name', 'Без названия')}' загружен!")
                     else:
                         st.error(f"❌ Паспорт с ID '{layer_id}' не найден")
                         
                 elif datatype == "BRE":
                     data = self.db_manager.get_bio_recognition_layer_by_id(layer_id)
                     if data:
-                        st.session_state.bio_bre_id = data['BRE_ID']
-                        st.session_state.bio_bre_name = data.get('BRE_Name') or ""
-                        st.session_state.bio_ph_min = data.get('PH_Min') or 0
-                        st.session_state.bio_ph_max = data.get('PH_Max') or 0
-                        st.session_state.bio_t_min = data.get('T_Min') or 0
-                        st.session_state.bio_t_max = data.get('T_Max') or 0
-                        st.session_state.bio_sensitivity = data.get('SN') or 0
-                        st.session_state.bio_dr_min = data.get('DR_Min') or 0
-                        st.session_state.bio_dr_max = data.get('DR_Max') or 0
-                        st.session_state.bio_reproducibility = data.get('RP') or 0
-                        st.session_state.bio_response_time = data.get('TR') or 0
-                        st.session_state.bio_stability = data.get('ST') or 0
-                        st.session_state.bio_lod = data.get('LOD') or 0
-                        st.session_state.bio_durability = data.get('HL') or 0
-                        st.session_state.bio_power_consumption = data.get('PC') or 0
+                        st.session_state['bio_bre_id'] = data.get('BRE_ID', '')
+                        st.session_state['bio_bre_name'] = data.get('BRE_Name', '')
+                        st.session_state['bio_ph_min'] = data.get('PH_Min', 0)
+                        st.session_state['bio_ph_max'] = data.get('PH_Max', 0)
+                        st.session_state['bio_t_min'] = data.get('T_Min', 0)
+                        st.session_state['bio_t_max'] = data.get('T_Max', 0)
+                        st.session_state['bio_sensitivity'] = data.get('SN', 0)
+                        st.session_state['bio_dr_min'] = data.get('DR_Min', 0)
+                        st.session_state['bio_dr_max'] = data.get('DR_Max', 0)
+                        st.session_state['bio_reproducibility'] = data.get('RP', 0)
+                        st.session_state['bio_response_time'] = data.get('TR', 0)
+                        st.session_state['bio_stability'] = data.get('ST', 0)
+                        st.session_state['bio_lod'] = data.get('LOD', 0)
+                        st.session_state['bio_durability'] = data.get('HL', 0)
+                        st.session_state['bio_power_consumption'] = data.get('PC', 0)
                         
-                        st.success(f"✅ Паспорт BRE '{data['BRE_Name']}' загружен! Данные заполнены в форме.")
+                        st.success(f"✅ Паспорт BRE '{data.get('BRE_Name', 'Без названия')}' загружен!")
                     else:
                         st.error(f"❌ Паспорт с ID '{layer_id}' не найден")
                         
                 elif datatype == "IM":
                     data = self.db_manager.get_immobilization_layer_by_id(layer_id)
                     if data:
-                        st.session_state.immob_im_id = data['IM_ID']
-                        st.session_state.immob_im_name = data.get('IM_Name') or ""
-                        st.session_state.immob_ph_min = data.get('PH_Min') or 0
-                        st.session_state.immob_ph_max = data.get('PH_Max') or 0
-                        st.session_state.immob_t_min = data.get('T_Min') or 0
-                        st.session_state.immob_t_max = data.get('T_Max') or 0
-                        st.session_state.immob_young_modulus = data.get('MP') or 0
-                        st.session_state.immob_adhesion = data.get('Adh') or "средняя"
-                        st.session_state.immob_solubility = data.get('Sol') or "средняя"
-                        st.session_state.immob_loss_coefficient = data.get('K_IM') or 0
-                        st.session_state.immob_reproducibility = data.get('RP') or 0
-                        st.session_state.immob_response_time = data.get('TR') or 0
-                        st.session_state.immob_stability = data.get('ST') or 0
-                        st.session_state.immob_durability = data.get('HL') or 0
-                        st.session_state.immob_power_consumption = data.get('PC') or 0
+                        st.session_state['immob_im_id'] = data.get('IM_ID', '')
+                        st.session_state['immob_im_name'] = data.get('IM_Name', '')
+                        st.session_state['immob_ph_min'] = data.get('PH_Min', 0)
+                        st.session_state['immob_ph_max'] = data.get('PH_Max', 0)
+                        st.session_state['immob_t_min'] = data.get('T_Min', 0)
+                        st.session_state['immob_t_max'] = data.get('T_Max', 0)
+                        st.session_state['immob_young_modulus'] = data.get('MP', 0)
+                        st.session_state['immob_adhesion'] = data.get('Adh', 'средняя')
+                        st.session_state['immob_solubility'] = data.get('Sol', 'средняя')
+                        st.session_state['immob_loss_coefficient'] = data.get('K_IM', 0)
+                        st.session_state['immob_reproducibility'] = data.get('RP', 0)
+                        st.session_state['immob_response_time'] = data.get('TR', 0)
+                        st.session_state['immob_stability'] = data.get('ST', 0)
+                        st.session_state['immob_durability'] = data.get('HL', 0)
+                        st.session_state['immob_power_consumption'] = data.get('PC', 0)
                         
-                        st.success(f"✅ Паспорт IM '{data['IM_Name']}' загружен! Данные заполнены в форме.")
+                        st.success(f"✅ Паспорт IM '{data.get('IM_Name', 'Без названия')}' загружен!")
                     else:
                         st.error(f"❌ Паспорт с ID '{layer_id}' не найден")
                         
                 elif datatype == "MEM":
                     data = self.db_manager.get_memristive_layer_by_id(layer_id)
                     if data:
-                        st.session_state.mem_mem_id = data['MEM_ID']
-                        st.session_state.mem_mem_name = data.get('MEM_Name') or ""
-                        st.session_state.mem_ph_min = data.get('PH_Min') or 0
-                        st.session_state.mem_ph_max = data.get('PH_Max') or 0
-                        st.session_state.mem_t_min = data.get('T_Min') or 0
-                        st.session_state.mem_t_max = data.get('T_Max') or 0
-                        st.session_state.mem_young_modulus = data.get('MP') or 0
-                        st.session_state.mem_sensitivity = data.get('SN') or 0
-                        st.session_state.mem_dr_min = data.get('DR_Min') or 0
-                        st.session_state.mem_dr_max = data.get('DR_Max') or 0
-                        st.session_state.mem_reproducibility = data.get('RP') or 0
-                        st.session_state.mem_response_time = data.get('TR') or 0
-                        st.session_state.mem_stability = data.get('ST') or 0
-                        st.session_state.mem_lod = data.get('LOD') or 0
-                        st.session_state.mem_durability = data.get('HL') or 0
-                        st.session_state.mem_power_consumption = data.get('PC') or 0
+                        st.session_state['mem_mem_id'] = data.get('MEM_ID', '')
+                        st.session_state['mem_mem_name'] = data.get('MEM_Name', '')
+                        st.session_state['mem_ph_min'] = data.get('PH_Min', 0)
+                        st.session_state['mem_ph_max'] = data.get('PH_Max', 0)
+                        st.session_state['mem_t_min'] = data.get('T_Min', 0)
+                        st.session_state['mem_t_max'] = data.get('T_Max', 0)
+                        st.session_state['mem_young_modulus'] = data.get('MP', 0)
+                        st.session_state['mem_sensitivity'] = data.get('SN', 0)
+                        st.session_state['mem_dr_min'] = data.get('DR_Min', 0)
+                        st.session_state['mem_dr_max'] = data.get('DR_Max', 0)
+                        st.session_state['mem_reproducibility'] = data.get('RP', 0)
+                        st.session_state['mem_response_time'] = data.get('TR', 0)
+                        st.session_state['mem_stability'] = data.get('ST', 0)
+                        st.session_state['mem_lod'] = data.get('LOD', 0)
+                        st.session_state['mem_durability'] = data.get('HL', 0)
+                        st.session_state['mem_power_consumption'] = data.get('PC', 0)
                         
-                        st.success(f"✅ Паспорт MEM '{data['MEM_Name']}' загружен! Данные заполнены в форме.")
+                        st.success(f"✅ Паспорт MEM '{data.get('MEM_Name', 'Без названия')}' загружен!")
                     else:
                         st.error(f"❌ Паспорт с ID '{layer_id}' не найден")
                         
@@ -2109,7 +1987,6 @@ class BiosensorGUI:
                 self.logger.error(f"Ошибка загрузки: {e}")
                 st.error(f"❌ Ошибка при загрузке: {str(e)}")
         
-        # Добавьте подсказку внизу
         st.info("💡 После загрузки данные появятся в форме ввода. Нажмите на раздел '🔬 Ввод' в меню, чтобы увидеть загруженные значения.")
 
     # streamlit
