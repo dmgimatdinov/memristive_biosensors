@@ -41,3 +41,4 @@ ui/__pycache__/passport_forms.cpython-311.pyc
 ui/__pycache__/sidebar.cpython-311.pyc
 ui/__pycache__/tables.cpython-311.pyc
 utils/__pycache__/logging_config.cpython-311.pyc
+st_examples/ex3_session.py

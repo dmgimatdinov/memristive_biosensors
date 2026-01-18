@@ -113,7 +113,11 @@ def main():
     # Конфигурация страницы — один раз
     st.set_page_config(
         page_title="Паспорта мемристивных биосенсоров v2.0",
-        layout="wide"
+        page_icon="🧪", 
+        layout="wide",
+        menu_items={ # Меню "Help"
+            'About': '# Это крутое приложение!'
+        }
     )
     st.title("Паспорта мемристивных биосенсоров v2.0")
     
@@ -122,11 +126,12 @@ def main():
     
     service = st.session_state.service
     active = show_sidebar(db)
+
     
     st.divider()
     
     # Роутинг по секциям
-    if active == "data_entry":
+    if active == "ввод":
         st.header("Ввод данных")
         
         form_type = st.selectbox(
@@ -142,34 +147,6 @@ def main():
                 st.session_state.form_data = {}
             else:
                 st.error(message)
-    
-    elif active == "database":
-        st.header("База данных")
-        # Показ таблиц, фильтры, пагинация...
-        analytes = service.get_all_analytes()
-        st.dataframe(analytes)
-    
-    elif active == "analysis":
-        st.header("Анализ")
-        # Аналитика, графики...
-        pass
-    
-    if active == "ввод":
-        st.header("Ввод данных")
-
-    form_type = st.selectbox(
-        "Выбери тип данных",
-        list(FORMS_CONFIG.keys())
-    )
-
-    form_data = render_form(form_type, service)
-    if form_data:
-        is_saved, message = service.save_analyte(form_data)
-        if is_saved:
-            st.success(message)
-            st.session_state.form_data = {}
-        else:
-            st.error(message)
             
     elif active == "база данных":
         st.header("База данных")

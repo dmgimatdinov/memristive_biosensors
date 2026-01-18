@@ -8,6 +8,8 @@ from functools import lru_cache
 from db.exceptions import DatabaseConnectionError, DatabaseIntegrityError
 from db.migrations import MigrationManager, ALL_MIGRATIONS
 
+from services.biosensor_service import DatabaseAdapter
+
 DB_NAME = "memristive_biosensor.db"
 
 logger = logging.getLogger(__name__)
@@ -71,7 +73,7 @@ class TableConfig(Enum):
     def __getitem__(self, key: str) -> Any:
         return self.config[key]
 
-class DatabaseManager:
+class DatabaseManager(DatabaseAdapter):
     """Слой работы с БД (без Streamlit)."""
 
     def __init__(self, db_name: str = DB_NAME):
@@ -583,3 +585,55 @@ class DatabaseManager:
         self.list_all_memristive_layers.cache_clear()
         self.list_all_sensor_combinations.cache_clear()
         self.logger.info("Кэш очищен")
+        
+    def analyte_exists(self):
+        pass
+        
+    def bio_recognition_exists(self):
+        pass
+    
+    def immobilization_exists(self):
+        pass
+    
+    def memristive_exists(self):
+        pass
+    
+    # DatabaseAdapter methods implementation
+    def insert(self, entity_type: str, data: Dict[str, Any]) -> Any:
+        """Универсальный insert на основе специфичных методов"""
+        methods = {
+            'analyte': self.insert_analyte,
+            'bio_recognition': self.insert_bio_recognition_layer,
+            'immobilization': self.insert_immobilization_layer,
+            'memristive': self.insert_memristive_layer,
+        }
+        
+        insert_method = methods.get(entity_type)
+        if not insert_method:
+            return f"Неизвестный тип: {entity_type}"
+        
+        return insert_method(data)
+    
+    def list_all_paginated(self, entity_type: str, limit: int, offset: int) -> List[Dict]:
+        methods = {
+            'analyte': self.list_all_analytes_paginated,
+            'bio_recognition': self.list_all_bio_recognition_paginated,
+            'immobilization': self.list_all_immobilization_layers_paginated,
+            'memristive': self.list_all_memristive_layers_paginated,
+        }
+        
+        list_method = methods.get(entity_type)
+        if list_method:
+            return list_method(limit, offset)
+        return []
+    
+    def entity_exists(self, entity_type: str, field: str, value: Any) -> bool:
+        exists_methods = {
+            'analyte': self.analyte_exists,
+            'bio_recognition': self.bio_recognition_exists,
+            'immobilization': self.immobilization_exists,
+            'memristive': self.memristive_exists,
+        }
+        method = exists_methods.get(entity_type)
+        return method(field, value) if method else False
+    
