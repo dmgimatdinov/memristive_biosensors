@@ -26,8 +26,8 @@ def test_save_valid_passport():
         ph_min=5.0, ph_max=8.0,
         t_min=20.0, t_max=50.0,
         young_modulus=50.0,  # Обязательное: modulus/parameter
-        adhesion="Good", sol="Water", kim=0.1,  # Опциональные
-        rp=90.0, tr=30.0, st=180.0, hl=2000, pc=200
+        adhesion="Good", solubility="Water", loss_coefficient=0.1,  # Опциональные
+        reproducibility=90.0, response_time=30.0, stability=180.0, half_life=2000, power_consumption=200
     )
     mem = MemristiveLayer(
         mem_id="MEM_TEST",
@@ -37,7 +37,7 @@ def test_save_valid_passport():
         sensitivity=1500.0,  # Обязательное: sensitivity
         young_modulus=40.0,  # modulus
         dr_min=0.1, dr_max=100.0,  # dynamic range
-        reproducibility=95.0, tr=20.0, stability=200.0, lod=1.0, hl=3000, pc=150
+        reproducibility=95.0, response_time=20.0, stability=200.0, lod=1.0, half_life=3000, power_consumption=150
     )
 
     ok, msg = service.save_passport(analyte, bio, immob, mem)
