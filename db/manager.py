@@ -586,18 +586,69 @@ class DatabaseManager(DatabaseAdapter):
         self.list_all_sensor_combinations.cache_clear()
         self.logger.info("Кэш очищен")
         
-    def analyte_exists(self) -> bool:
-        pass
-        
-    def bio_recognition_exists(self) -> bool:
-        pass
-    
-    def immobilization_exists(self) -> bool:
-        pass
-    
-    def memristive_exists(self) -> bool:
-        pass
-    
+    def analyte_exists(self, field: str, value: Any) -> bool:
+        query = f"""
+        SELECT EXISTS(
+            SELECT 1 FROM {TableConfig.ANALYTES["table"]}
+            WHERE {field} = ?
+        )
+        """
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (value,))
+                return cursor.fetchone()[0] == 1
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка проверки существования аналита: {e}")
+            return False
+
+    def bio_recognition_exists(self, field: str, value: Any) -> bool:
+        query = f"""
+        SELECT EXISTS(
+            SELECT 1 FROM {TableConfig.BIO_RECOGNITION["table"]}
+            WHERE {field} = ?
+        )
+        """
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (value,))
+                return cursor.fetchone()[0] == 1
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка проверки существования биослоя: {e}")
+            return False
+    def immobilization_exists(self, field: str, value: Any) -> bool:
+        query = f"""
+        SELECT EXISTS(
+            SELECT 1 FROM {TableConfig.IMMOBILIZATION["table"]}
+            WHERE {field} = ?
+        )
+        """
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (value,))
+                return cursor.fetchone()[0] == 1
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка проверки существования иммобилизационного слоя: {e}")
+            return False
+
+    def memristive_exists(self, field: str, value: Any) -> bool:
+        query = f"""
+        SELECT EXISTS(
+            SELECT 1 FROM {TableConfig.MEMRISTIVE["table"]}
+            WHERE {field} = ?
+        )
+        """
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (value,))
+                return cursor.fetchone()[0] == 1
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка проверки существования мемристивного слоя: {e}")
+            return False
+
     # DatabaseAdapter methods implementation
     def insert(self, entity_type: str, data: Dict[str, Any]) -> Any:
         """Универсальный insert на основе специфичных методов"""
