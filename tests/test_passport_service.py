@@ -9,19 +9,37 @@ def test_save_valid_passport():
     service = PassportService(db)
     
     analyte = Analyte(
-        ta_id="TA_TEST", 
-        ta_name="Test Analyte", 
-        ph_min=5.0, ph_max=8.0  # Обязательные по SENSORLAYERSCONFIG
+        ta_id="TA_TEST",
+        ta_name="Test Analyte",
+        ph_min=5.0, ph_max=8.0,
+        t_max=50.0, stability=30.0, half_life=1000, power_consumption=100
     )
     bio = BioRecognitionLayer(
-        bre_id="BRE_TEST", 
-        bre_name="Test Bio", 
-        ph_min=5.0, ph_max=8.0, t_min=20.0, t_max=40.0
+        bre_id="BRE_TEST",
+        bre_name="Test Bio",
+        ph_min=5.0, ph_max=8.0,
+        t_min=20.0, t_max=40.0, sensitivity=1000
     )
-    immob = ImmobilizationLayer(im_id="IM_TEST", im_name="Test Immob", ph_min=5.0, ph_max=8.0)
-    mem = MemristiveLayer(mem_id="MEM_TEST", mem_name="Test Mem", ph_min=5.0, ph_max=8.0)
+    immob = ImmobilizationLayer(
+        im_id="IM_TEST",
+        im_name="Test Immob",
+        ph_min=5.0, ph_max=8.0,
+        t_min=20.0, t_max=50.0,
+        young_modulus=50.0,  # Обязательное: modulus/parameter
+        adhesion="Good", sol="Water", kim=0.1,  # Опциональные
+        rp=90.0, tr=30.0, st=180.0, hl=2000, pc=200
+    )
+    mem = MemristiveLayer(
+        mem_id="MEM_TEST",
+        mem_name="Test Mem",
+        ph_min=5.0, ph_max=8.0,
+        t_min=20.0, t_max=50.0,
+        sensitivity=1500.0,  # Обязательное: sensitivity
+        young_modulus=40.0,  # modulus
+        dr_min=0.1, dr_max=100.0,  # dynamic range
+        reproducibility=95.0, tr=20.0, stability=200.0, lod=1.0, hl=3000, pc=150
+    )
 
-    
     ok, msg = service.save_passport(analyte, bio, immob, mem)
     assert ok is True
 
