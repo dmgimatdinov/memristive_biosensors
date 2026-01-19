@@ -282,14 +282,12 @@ class UniversalCRUDManager:
 
 
 class BiosensorService:
-    
     def __init__(self, db: DatabaseAdapter):
         self.validator = UniversalBiosensorValidator(SENSOR_LAYERS_CONFIG, db)
         self.crud = UniversalCRUDManager(self.validator, db)
         self.db = db
-
-    
-    # ✅ СТАЛО: Универсальные методы
+        
+    # Универсальные методы
     def validate_entity(self, entity_type: str, data: Dict[str, Any]) -> ValidationResult:
         """Валидация любого слоя"""
         return self.validator.validate(entity_type, data)

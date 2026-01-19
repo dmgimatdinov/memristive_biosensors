@@ -586,16 +586,16 @@ class DatabaseManager(DatabaseAdapter):
         self.list_all_sensor_combinations.cache_clear()
         self.logger.info("Кэш очищен")
         
-    def analyte_exists(self):
+    def analyte_exists(self) -> bool:
         pass
         
-    def bio_recognition_exists(self):
+    def bio_recognition_exists(self) -> bool:
         pass
     
-    def immobilization_exists(self):
+    def immobilization_exists(self) -> bool:
         pass
     
-    def memristive_exists(self):
+    def memristive_exists(self) -> bool:
         pass
     
     # DatabaseAdapter methods implementation
