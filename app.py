@@ -150,8 +150,12 @@ def main():
             
     elif active == "база данных":
         st.header("База данных")
-        analytes = service.get_all_analytes()
-        st.dataframe(analytes)
+        form_type = st.selectbox(
+            "Выбери тип данных",
+            list(FORMS_CONFIG.keys())
+        )
+        entities = service.get_all_entities(form_type)
+        st.dataframe(entities)
     
     elif active == "анализ":
         col1, col2, col3 = st.columns(3)

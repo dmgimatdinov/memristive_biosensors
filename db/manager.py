@@ -668,7 +668,7 @@ class DatabaseManager(DatabaseAdapter):
     def list_all_paginated(self, entity_type: str, limit: int, offset: int) -> List[Dict]:
         methods = {
             'analyte': self.list_all_analytes_paginated,
-            'bio_recognition': self.list_all_bio_recognition_paginated,
+            'bio_recognition': self.list_all_bio_recognition_layers_paginated,
             'immobilization': self.list_all_immobilization_layers_paginated,
             'memristive': self.list_all_memristive_layers_paginated,
         }
