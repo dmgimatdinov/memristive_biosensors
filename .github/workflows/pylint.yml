@@ -1,9 +1,10 @@
 name: Pylint
 
 on:
-  pull_request:
-    branches:
-    - dev
+  workflow_dispatch: # ручной запуск
+  # pull_request:
+  #   branches:
+  #   - dev
 
 jobs:
   build:

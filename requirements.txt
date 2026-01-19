@@ -36,9 +36,9 @@ tzdata==2025.2
 urllib3==2.5.0
 watchdog==6.0.0
 
-PyPDF2==3.1.1
+pypdf==4.3.1
 python-docx==0.8.11
-openpyxl==3.10.1
+openpyxl
 
 beautifulsoup4==4.12.2
 reportlab==4.0.9

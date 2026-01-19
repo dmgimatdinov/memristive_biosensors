@@ -4,8 +4,9 @@
 name: Python application
 
 on:
-  pull_request:
-    branches: [ "main", "dev" ]
+  workflow_dispatch: # ручной запуск
+  # pull_request:
+  #   branches: [ "main", "dev" ]
 
 permissions:
   contents: read
