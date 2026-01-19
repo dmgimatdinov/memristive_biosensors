@@ -7,11 +7,20 @@ def test_validate_analyte():
     service = BiosensorService(db)
     
     # Валидные данные
-    data = {"ta_id": "TA001", "ta_name": "Glucose", "t_max": 50.0}
-    is_valid, msg = service.validate_analyte(data)
+    data = {
+        "ta_id": "TA001",      # ta_id → taid
+        "ta_name": "Glucose",  # ta_name → taname
+        "ph_min": 5.0,         # Добавьте обязательные
+        "ph_max": 8.0
+    }
+    result = service.validator.validate("analyte", data) 
+    is_valid = result.is_valid
+    msg = ", ".join(result.errors) if not is_valid else None
     assert is_valid is True
     
     # Невалидные данные
     data = {"ta_id": "TA001", "ta_name": "Glucose", "t_max": 500.0}  # вне диапазона
-    is_valid, msg = service.validate_analyte(data)
+    result = service.validator.validate("analyte", data)
+    is_valid = result.is_valid
+    msg = ", ".join(result.errors) if not is_valid else None
     assert is_valid is False

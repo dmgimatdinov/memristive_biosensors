@@ -1,6 +1,4 @@
 # services/biosensor_service.py
-from db.manager import DatabaseManager
-from domain.models import Analyte, BioRecognitionLayer
 from domain.config import FIELD_CONSTRAINTS
 # from typing import Dict, Any, Optional
 

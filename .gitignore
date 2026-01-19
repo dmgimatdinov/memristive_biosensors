@@ -42,3 +42,8 @@ ui/__pycache__/sidebar.cpython-311.pyc
 ui/__pycache__/tables.cpython-311.pyc
 utils/__pycache__/logging_config.cpython-311.pyc
 st_examples/ex3_session.py
+domain/__pycache__/__init__.cpython-311.pyc
+services/__pycache__/__init__.cpython-311.pyc
+tests/__pycache__/test_biosensor_service.cpython-311-pytest-9.0.2.pyc
+tests/__pycache__/test_passport_service.cpython-311-pytest-9.0.2.pyc
+tests/__pycache__/test_validators.cpython-311-pytest-9.0.2.pyc
