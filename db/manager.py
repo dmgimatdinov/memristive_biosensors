@@ -688,3 +688,5 @@ class DatabaseManager(DatabaseAdapter):
         method = exists_methods.get(entity_type)
         return method(field, value) if method else False
     
+    
+    

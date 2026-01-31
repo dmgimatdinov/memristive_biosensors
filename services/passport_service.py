@@ -136,7 +136,13 @@ class PassportService:
             'lod_total': 'LOD_total', 'dr_total': 'DR_total',
             'hl_total': 'HL_total', 'pc_total': 'PC_total',
             'score': 'Score',
-            # ... и т.д.
+            'ph_min': 'PHMin', 'ph_max': 'PHMax', 't_min': 'TMin', 't_max': 'TMax',
+            'stability': 'ST', 'half_life': 'HL','durability': 'HL',
+            'power_consumption': 'PC',
+            'sensitivity': 'SN', 'young_modulus': 'MP',
+            'reproducibility': 'RP', 'response_time': 'TR', 'lod': 'LOD',
+            'loss_coefficient': 'KIM', 'adhesion': 'Adh', 'solubility': 'Sol',
+            'dr_min': 'DRMin', 'dr_max': 'DRMax'
         }
         
         converted = {}
