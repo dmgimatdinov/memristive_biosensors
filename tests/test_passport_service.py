@@ -41,7 +41,7 @@ def test_save_valid_passport():
     )
 
     ok, msg = service.save_passport(analyte, bio, immob, mem)
-    assert ok is True
+    assert ok == True
 
 def test_duplicate_detection():
     db = DatabaseManager()
@@ -57,5 +57,5 @@ def test_duplicate_detection():
     
     # Второй раз — должен вернуть DUPLICATE
     ok, result = service.save_passport(analyte, bio, immob, mem)
-    assert ok is False
+    assert ok == False
     assert result[0] == "DUPLICATE"

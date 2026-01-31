@@ -14,7 +14,7 @@ def test_validate_analyte_valid():
         t_max=50.0
     )
     is_valid, error = DataValidator.validate_analyte(analyte)
-    assert is_valid is True
+    assert is_valid == True
     assert error is None
 
 def test_validate_analyte_invalid_ph_range():
@@ -26,7 +26,7 @@ def test_validate_analyte_invalid_ph_range():
         ph_max=5.0  # Неправильно!
     )
     is_valid, error = DataValidator.validate_analyte(analyte)
-    assert is_valid is False
+    assert is_valid == False
     assert "pH_min не может быть больше pH_max" in error
 
 def test_validate_analyte_missing_id():
@@ -36,7 +36,7 @@ def test_validate_analyte_missing_id():
         ta_name="No ID"
     )
     is_valid, error = DataValidator.validate_analyte(analyte)
-    assert is_valid is False
+    assert is_valid == False
     assert "обязательны" in error
 
 def test_validate_bio_layer_valid():
@@ -48,4 +48,4 @@ def test_validate_bio_layer_valid():
         t_max=40.0
     )
     is_valid, error = DataValidator.validate_bio_recognition_layer(bio)
-    assert is_valid is True
+    assert is_valid == True
