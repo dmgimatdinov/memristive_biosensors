@@ -16,11 +16,11 @@ def test_validate_analyte():
     result = service.validator.validate("analyte", data) 
     is_valid = result.is_valid
     msg = ", ".join(result.errors) if not is_valid else None
-    assert is_valid is True
+    assert is_valid == True
     
     # Невалидные данные
     data = {"ta_id": "TA001", "ta_name": "Glucose", "t_max": 500.0}  # вне диапазона
     result = service.validator.validate("analyte", data)
     is_valid = result.is_valid
     msg = ", ".join(result.errors) if not is_valid else None
-    assert is_valid is False
+    assert is_valid == False
