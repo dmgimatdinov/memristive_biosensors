@@ -48,3 +48,4 @@ tests/__pycache__/test_biosensor_service.cpython-311-pytest-9.0.2.pyc
 tests/__pycache__/test_passport_service.cpython-311-pytest-9.0.2.pyc
 tests/__pycache__/test_validators.cpython-311-pytest-9.0.2.pyc
 application-inspector-analyzer/
+.ai
